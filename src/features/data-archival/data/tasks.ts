@@ -1,0 +1,235 @@
+import { archivalConfig } from "../config";
+import type { QueuedTask, SeriesPoint, WorkerNode } from "../types";
+
+/**
+ * TASKS fixture — the full queue behind the six live rows the Archive Browser
+ * shows in its rail. The first six ids match `SEED_TASKS` in `seed.ts`, so the
+ * board and this screen describe the same six running jobs.
+ */
+
+const at = (iso: string) => Date.parse(iso);
+const T0 = archivalConfig.demoEpoch;
+
+export const SEED_TASK_STATS = {
+  running: 6,
+  queued: 14,
+  completedToday: 248,
+  failedToday: 3,
+  avgDurationSeconds: 8 * 60 + 41,
+  successRatePercent: 98.8,
+};
+
+export const SEED_TASK_QUEUE: QueuedTask[] = [
+  {
+    id: "ARC-4482",
+    name: "Telemetry Data Archival",
+    category: "Archival",
+    target: "Tile-05",
+    priority: "high",
+    progress: 72,
+    etaSeconds: 14 * 60 + 32,
+    state: "running",
+    startedAt: at("2025-05-20T18:04:12+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "CMP-4479",
+    name: "Waveform Data Compression",
+    category: "Compression",
+    target: "TX-Array",
+    priority: "high",
+    progress: 45,
+    etaSeconds: 12 * 60 + 11,
+    state: "running",
+    startedAt: at("2025-05-20T18:12:40+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "RET-4476",
+    name: "Log Retention & Cleanup",
+    category: "Retention",
+    target: "System",
+    priority: "medium",
+    progress: 89,
+    etaSeconds: 3 * 60 + 21,
+    state: "running",
+    startedAt: at("2025-05-20T17:58:05+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "VAL-4474",
+    name: "Calibration Data Validation",
+    category: "Validation",
+    target: "Cal Module",
+    priority: "medium",
+    progress: 33,
+    etaSeconds: 15 * 60 + 42,
+    state: "running",
+    startedAt: at("2025-05-20T18:20:18+05:30"),
+    owner: "r.iyer",
+  },
+  {
+    id: "RPT-4471",
+    name: "Report Generation",
+    category: "Reporting",
+    target: "Analytics",
+    priority: "low",
+    progress: 66,
+    etaSeconds: 6 * 60 + 18,
+    state: "running",
+    startedAt: at("2025-05-20T18:26:52+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "BKP-4468",
+    name: "Backup to Remote Storage",
+    category: "Replication",
+    target: "Archive Server",
+    priority: "high",
+    progress: 78,
+    etaSeconds: 9 * 60 + 7,
+    state: "running",
+    startedAt: at("2025-05-20T17:49:31+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "IDX-4467",
+    name: "Rebuild Archive Index Shard 04",
+    category: "Indexing",
+    target: "arch-node-02",
+    priority: "medium",
+    progress: 0,
+    etaSeconds: 0,
+    state: "queued",
+    startedAt: at("2025-05-20T18:44:00+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "ARC-4466",
+    name: "Waveform Archival — Beam 12",
+    category: "Archival",
+    target: "TX-Array",
+    priority: "high",
+    progress: 0,
+    etaSeconds: 0,
+    state: "queued",
+    startedAt: at("2025-05-20T18:45:00+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "VAL-4465",
+    name: "Checksum Sweep — Cold Vault",
+    category: "Validation",
+    target: "Cold Storage",
+    priority: "low",
+    progress: 0,
+    etaSeconds: 0,
+    state: "queued",
+    startedAt: at("2025-05-20T18:50:00+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "CMP-4463",
+    name: "Telemetry Block Recompression",
+    category: "Compression",
+    target: "arch-node-01",
+    priority: "low",
+    progress: 0,
+    etaSeconds: 0,
+    state: "queued",
+    startedAt: at("2025-05-20T19:00:00+05:30"),
+    owner: "s.menon",
+  },
+  {
+    id: "REP-4461",
+    name: "Replicate Segment Batch 0x1f4a",
+    category: "Replication",
+    target: "Remote Vault",
+    priority: "medium",
+    progress: 41,
+    etaSeconds: 0,
+    state: "paused",
+    startedAt: at("2025-05-20T17:31:09+05:30"),
+    owner: "s.menon",
+  },
+  {
+    id: "CMP-4471",
+    name: "Scheduler Log Compaction",
+    category: "Compression",
+    target: "arch-node-03",
+    priority: "medium",
+    progress: 62,
+    etaSeconds: 0,
+    state: "failed",
+    startedAt: at("2025-05-20T18:11:47+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "ARC-4459",
+    name: "Configuration Snapshot Archival",
+    category: "Archival",
+    target: "Controller-1",
+    priority: "low",
+    progress: 100,
+    etaSeconds: 0,
+    state: "completed",
+    startedAt: at("2025-05-20T18:02:14+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "VAL-4457",
+    name: "Integrity Sweep — Primary Array",
+    category: "Validation",
+    target: "Primary Array",
+    priority: "high",
+    progress: 100,
+    etaSeconds: 0,
+    state: "completed",
+    startedAt: at("2025-05-20T17:35:12+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "RET-4455",
+    name: "Purge Expired Trace Logs",
+    category: "Retention",
+    target: "arch-node-02",
+    priority: "low",
+    progress: 100,
+    etaSeconds: 0,
+    state: "completed",
+    startedAt: at("2025-05-20T17:20:03+05:30"),
+    owner: "auto-scheduler",
+  },
+  {
+    id: "IDX-4452",
+    name: "Reindex Mission TRACK-284",
+    category: "Indexing",
+    target: "arch-node-01",
+    priority: "medium",
+    progress: 100,
+    etaSeconds: 0,
+    state: "completed",
+    startedAt: at("2025-05-20T16:58:41+05:30"),
+    owner: "r.iyer",
+  },
+];
+
+export const SEED_WORKERS: WorkerNode[] = [
+  { id: "w-1", label: "arch-node-01", utilization: 84, activeTasks: 2, state: "online" },
+  { id: "w-2", label: "arch-node-02", utilization: 71, activeTasks: 2, state: "online" },
+  { id: "w-3", label: "arch-node-03", utilization: 18, activeTasks: 0, state: "draining" },
+  { id: "w-4", label: "ctrl-01", utilization: 46, activeTasks: 1, state: "online" },
+  { id: "w-5", label: "ctrl-02", utilization: 39, activeTasks: 1, state: "online" },
+];
+
+/** Tasks completed per hour over the last twelve hours. */
+const THROUGHPUT = [14, 12, 18, 31, 27, 22, 19, 24, 29, 21, 17, 16];
+
+const IST_OFFSET_MS = 5.5 * 3_600_000;
+const topOfHour =
+  Math.floor((T0 + IST_OFFSET_MS) / 3_600_000) * 3_600_000 - IST_OFFSET_MS;
+
+export const SEED_TASK_THROUGHPUT: SeriesPoint[] = THROUGHPUT.map((value, i) => ({
+  t: topOfHour - (THROUGHPUT.length - 1 - i) * 3_600_000,
+  value,
+}));
