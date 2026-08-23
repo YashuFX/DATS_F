@@ -1,19 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { CircleCheck } from "lucide-react";
 import { DATA_TYPE_MAP } from "../../config";
-import { SEED_RECORDS } from "../../data/seed";
 import { DATA_TYPE_ICON } from "../../lib/icons";
 import { formatBytes, formatClock } from "../../lib/format";
 import type { ArchiveRecord } from "../../types";
 import { Button } from "../ui/Button";
 import { PriorityBadge } from "../ui/Badge";
 import { Card, CardHeader } from "../ui/Card";
+import { useArchivalStore } from "../../store/useArchivalStore";
 
-/**
- * Column widths are fixed in rem so the eight columns hold their rhythm at any
- * scale; only FILE / RECORD NAME flexes and truncates.
- */
 const COLS = [
   { key: "time", label: "Time (IST)", width: "7.5rem" },
   { key: "type", label: "Data Type", width: "8.75rem" },
@@ -26,13 +23,16 @@ const COLS = [
 ] as const;
 
 function Row({ record }: { record: ArchiveRecord }) {
-  const meta = DATA_TYPE_MAP[record.dataType];
-  const Icon = DATA_TYPE_ICON[record.dataType];
+  const meta = DATA_TYPE_MAP[record.dataType] ?? {
+    label: record.dataType,
+    color: "da-c1",
+  };
+  const Icon = DATA_TYPE_ICON[record.dataType] ?? CircleCheck;
 
   return (
     <tr className="h-[2.125rem] border-b-[max(1px,0.0625rem)] border-da-border/70 transition-colors last:border-b-0 hover:bg-da-subtle">
       <td className="da-nums px-[0.75rem] text-2xs font-medium text-da-muted">
-        20 May {formatClock(record.timestamp)}
+        {formatClock(record.timestamp)}
       </td>
       <td className="px-[0.75rem]">
         <span className="flex items-center gap-[0.375rem]">
@@ -73,16 +73,17 @@ function Row({ record }: { record: ArchiveRecord }) {
   );
 }
 
-export function RecentArchivedTable({
-  records = SEED_RECORDS,
-}: {
-  records?: ArchiveRecord[];
-}) {
+export function RecentArchivedTable() {
+  const records = useArchivalStore((s) => s.records);
   return (
     <Card className="min-h-0 flex-1">
       <CardHeader
         title="Recent Archived Data"
-        action={<Button size="sm">View All Archives</Button>}
+        action={
+          <Link href="/data-archival/logs">
+            <Button size="sm">View All Archives</Button>
+          </Link>
+        }
       />
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full table-fixed border-collapse">

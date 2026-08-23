@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Bell, ChevronDown, Clock, Database, HardDrive, ListChecks, Settings, TriangleAlert } from "lucide-react";
+import { Archive, ChevronDown, Clock, Database, HardDrive, ListChecks, Settings, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { archivalConfig } from "../../config";
 import { SettingsButton } from "@/features/shell/SettingsButton";
@@ -154,24 +154,6 @@ export function AppHeader() {
         <SettingsButton />
         <ThemeToggle />
 
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative flex size-[1.75rem] cursor-pointer items-center justify-center rounded-[0.25rem] text-da-muted transition-colors hover:bg-da-subtle hover:text-da-text"
-        >
-          <Bell className="size-[0.9375rem]" strokeWidth={2} />
-          <span className="da-nums absolute -right-[0.0625rem] -top-[0.0625rem] flex min-w-[0.75rem] items-center justify-center rounded-full bg-da-danger px-[0.1875rem] text-[0.4375rem] font-bold leading-[0.75rem] text-white dark:text-da-bg">
-            3
-          </span>
-        </button>
-
-        <button
-          type="button"
-          aria-label="Settings"
-          className="flex size-[1.75rem] cursor-pointer items-center justify-center rounded-[0.25rem] text-da-muted transition-colors hover:bg-da-subtle hover:text-da-text"
-        >
-          <Settings className="size-[0.9375rem]" strokeWidth={2} />
-        </button>
 
         <button
           type="button"

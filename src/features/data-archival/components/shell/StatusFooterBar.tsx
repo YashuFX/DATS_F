@@ -6,6 +6,7 @@ import { SEED_HEALTH } from "../../data/seed";
 import { useDemoClock } from "../../hooks/useDemoClock";
 import { cn } from "../../lib/cn";
 import { formatCountdown, formatDateTime } from "../../lib/format";
+import { useArchivalStore } from "../../store/useArchivalStore";
 import { Button } from "../ui/Button";
 
 function FooterItem({
@@ -36,6 +37,7 @@ function FooterItem({
 
 export function StatusFooterBar() {
   const now = useDemoClock();
+  const setManualDialogOpen = useArchivalStore((s) => s.setManualDialogOpen);
 
   // Countdown loops so the board always has a live next-archive timer.
   const elapsed = Math.floor((now - SEED_HEALTH.lastArchiveAt) / 1000);
@@ -67,7 +69,10 @@ export function StatusFooterBar() {
           valueTone="text-da-success"
         />
         <FooterItem label="Next Archive" value={`In ${formatCountdown(nextArchive)}`} />
-        <Button icon={<Upload className="size-[0.75rem]" strokeWidth={2.4} />}>
+        <Button
+          onClick={() => setManualDialogOpen(true)}
+          icon={<Upload className="size-[0.75rem]" strokeWidth={2.4} />}
+        >
           Manual Archive Now
         </Button>
       </div>

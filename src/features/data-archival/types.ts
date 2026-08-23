@@ -15,6 +15,8 @@ export type DataTypeId =
   | "calibration"
   | "reports";
 
+export type DataType = DataTypeId;
+
 export type PriorityId = "critical" | "high" | "medium" | "low";
 
 export type ArchiveStatusId = "archived" | "archiving" | "queued" | "failed";

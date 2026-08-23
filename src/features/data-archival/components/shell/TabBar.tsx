@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 import { TABS } from "../../config";
 import { cn } from "../../lib/cn";
 
@@ -55,14 +55,6 @@ export function TabBar() {
             className="h-full w-full rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border bg-da-field pl-[0.625rem] pr-[1.75rem] text-2xs text-da-text placeholder:text-da-label focus:border-da-brand focus:outline-none"
           />
         </label>
-
-        <button
-          type="button"
-          className="inline-flex h-[1.75rem] cursor-pointer items-center gap-[0.3125rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-brand/35 bg-da-surface px-[0.625rem] text-2xs font-bold uppercase tracking-[0.05em] text-da-brand transition-colors hover:bg-da-brand-soft"
-        >
-          <SlidersHorizontal className="size-[0.75rem]" strokeWidth={2.2} />
-          Advanced Search
-        </button>
       </div>
     </nav>
   );

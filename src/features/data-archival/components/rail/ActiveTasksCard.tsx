@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { SEED_TASKS } from "../../data/seed";
 import { cn } from "../../lib/cn";
 import { formatDuration } from "../../lib/format";
@@ -58,7 +59,11 @@ export function ActiveTasksCard({
     <Card className={cn("min-h-0", className)}>
       <CardHeader
         title="Active Tasks"
-        action={<Button variant="link">View All</Button>}
+        action={
+          <Link href="/data-archival/tasks">
+            <Button variant="link">View All</Button>
+          </Link>
+        }
       />
       <ul className="divide-y-[max(1px,0.0625rem)] divide-da-border/70">
         {tasks.map((task) => (

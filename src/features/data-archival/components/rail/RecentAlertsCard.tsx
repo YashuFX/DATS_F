@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Info, TriangleAlert } from "lucide-react";
 import { SEED_ALERTS } from "../../data/seed";
 import { cn } from "../../lib/cn";
@@ -59,7 +60,14 @@ export function RecentAlertsCard({
 
   return (
     <Card className={cn("min-h-0", className)}>
-      <CardHeader title="Recent Alerts" action={<Button variant="link">View All</Button>} />
+      <CardHeader
+        title="Recent Alerts"
+        action={
+          <Link href="/data-archival/alerts">
+            <Button variant="link">View All</Button>
+          </Link>
+        }
+      />
 
       <ul className="min-h-0 flex-1 divide-y-[max(1px,0.0625rem)] divide-da-border/70 overflow-y-auto">
         {alerts.map((alert) => (

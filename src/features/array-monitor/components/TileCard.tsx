@@ -119,12 +119,15 @@ export function TileCard({
     <div
       role="button"
       tabIndex={0}
-      onClick={onSelect}
-      onDoubleClick={onOpen}
+      onClick={() => {
+        onSelect();
+        if (onOpen) onOpen();
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect();
+          if (onOpen) onOpen();
         }
       }}
       aria-pressed={selected}

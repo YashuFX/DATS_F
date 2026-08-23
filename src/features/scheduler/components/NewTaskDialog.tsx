@@ -115,7 +115,7 @@ export function NewTaskDialog({
 
   const satellite = CATALOGUE.find((s) => s.name === satName) ?? CATALOGUE[0];
   const [frequencyMHz, setFrequencyMHz] = useState(
-    String(satellite?.frequencyMHz ?? 8200),
+    String(satellite?.frequencyMHz ?? 2250),
   );
 
   /** Everything derived from the two clock fields, including why they're invalid. */

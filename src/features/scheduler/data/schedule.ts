@@ -69,16 +69,16 @@ const FAMILIES: {
   band: [number, number];
   priority: Priority;
 }[] = [
-  { prefix: "RISAT", orbit: "SSO", band: [8025, 8400], priority: 1 },
-  { prefix: "CARTOSAT", orbit: "SSO", band: [8025, 8400], priority: 1 },
-  { prefix: "OCEANSAT", orbit: "SSO", band: [8100, 8300], priority: 2 },
-  { prefix: "RESOURCESAT", orbit: "SSO", band: [8125, 8350], priority: 2 },
-  { prefix: "INSAT", orbit: "GEO", band: [4500, 4800], priority: 1 },
-  { prefix: "GSAT", orbit: "GEO", band: [4500, 4800], priority: 2 },
-  { prefix: "NAVIC", orbit: "MEO", band: [2200, 2290], priority: 2 },
-  { prefix: "ASTROSAT", orbit: "HEO", band: [2200, 2290], priority: 3 },
-  { prefix: "SCATSAT", orbit: "LEO", band: [2200, 2290], priority: 3 },
-  { prefix: "MICROSAT", orbit: "LEO", band: [2200, 2290], priority: 3 },
+  { prefix: "RISAT", orbit: "SSO", band: [2200, 2300], priority: 1 },
+  { prefix: "CARTOSAT", orbit: "SSO", band: [2200, 2300], priority: 1 },
+  { prefix: "OCEANSAT", orbit: "SSO", band: [2200, 2300], priority: 2 },
+  { prefix: "RESOURCESAT", orbit: "SSO", band: [2200, 2300], priority: 2 },
+  { prefix: "INSAT", orbit: "GEO", band: [2200, 2300], priority: 1 },
+  { prefix: "GSAT", orbit: "GEO", band: [2200, 2300], priority: 2 },
+  { prefix: "NAVIC", orbit: "MEO", band: [2200, 2300], priority: 2 },
+  { prefix: "ASTROSAT", orbit: "HEO", band: [2200, 2300], priority: 3 },
+  { prefix: "SCATSAT", orbit: "LEO", band: [2200, 2300], priority: 3 },
+  { prefix: "MICROSAT", orbit: "LEO", band: [2200, 2300], priority: 3 },
 ];
 
 export const MODULATIONS = ["QPSK", "OQPSK", "8PSK", "BPSK", "16APSK"];

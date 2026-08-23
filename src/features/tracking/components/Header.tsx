@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Bell, Settings, Sun, Moon, User } from 'lucide-react';
+import { ShieldCheck, Settings, Sun, Moon, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboard } from '../context/DashboardContext';
@@ -127,13 +127,6 @@ export default function Header() {
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {theme === 'dark' ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
-          </button>
-          
-          <button className="p-1.5 rounded-da text-da-muted hover:text-da-text hover:bg-da-bg transition-all relative cursor-pointer">
-            <Bell className="h-4.5 w-4.5" />
-            <span className="absolute top-1 right-1 h-3 w-3 bg-da-danger text-[0.5rem] font-bold text-white flex items-center justify-center rounded-full">
-              9
-            </span>
           </button>
 
           {/* This gear was decorative in the migrated console. It goes to Settings now. */}
