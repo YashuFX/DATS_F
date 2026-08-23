@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowRight, ListFilter } from 'lucide-react';
+import { ListFilter } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 
 export default function TrackEvents() {
@@ -78,12 +78,6 @@ export default function TrackEvents() {
           ))
         )}
       </div>
-
-      {/* Footer view-all link */}
-      <button className="shrink-0 flex items-center justify-center gap-1.5 w-full py-1.5 bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da text-[0.625rem] font-black uppercase text-da-muted hover:text-da-text hover:bg-da-border/40 transition-colors cursor-pointer">
-        <span>View All Events</span>
-        <ArrowRight className="h-3 w-3" />
-      </button>
     </div>
   );
 }

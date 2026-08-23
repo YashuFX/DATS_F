@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { getRuntimeConfig, RUNTIME_DEFAULTS } from "@/lib/runtimeConfig";
 import { persist } from "zustand/middleware";
 import { HISTORY } from "../data/schedule";
 import type { PassRecord, SatellitePass } from "../types";
@@ -21,8 +22,13 @@ import type { PassRecord, SatellitePass } from "../types";
  * table needs no knowledge of where a row came from.
  */
 
-/** Records kept before the oldest are dropped, so localStorage cannot grow without bound. */
-const MAX_RECORDS = 500;
+/**
+ * Records kept before the oldest are dropped, so localStorage cannot grow
+ * without bound. The ceiling is the operator's, set in Settings → Data, and
+ * read at write time rather than captured — raising it must not require a
+ * reload to take effect.
+ */
+const MAX_RECORDS = RUNTIME_DEFAULTS.archiveCap;
 
 /**
  * Stable pseudo-noise from a pass id.
@@ -156,7 +162,12 @@ export const usePassHistoryStore = create<PassHistoryState>()(
             nextAcqId(state.records),
             sourceKey,
           );
-          return { records: [record, ...state.records].slice(0, MAX_RECORDS) };
+          return {
+            records: [record, ...state.records].slice(
+              0,
+              getRuntimeConfig().archiveCap || MAX_RECORDS,
+            ),
+          };
         }),
 
       clearHistory: () => set({ records: [] }),

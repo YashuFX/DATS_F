@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { Power } from "lucide-react";
 import { cn } from "@/features/data-archival/lib/cn";
-import { ANTENNAS, STATION } from "../data/schedule";
+import { useRuntimeConfig } from "@/lib/runtimeConfig";
+import { ANTENNAS } from "../data/schedule";
 import type { SatellitePass } from "../types";
 
 /**
@@ -34,6 +35,7 @@ export function TimelineViewport({
   /** True before the health check has run: there is no schedule yet, by design. */
   cold?: boolean;
 }) {
+  const stationName = useRuntimeConfig().stationName;
   const [zoomMin, setZoomMin] = useState(120);
   const [panOffsetMin, setPanOffsetMin] = useState(0);
 
@@ -110,7 +112,7 @@ export function TimelineViewport({
         <span className="text-2xs font-bold uppercase tracking-[0.14em] text-da-text">
           Aperture Timeline
           <span className="ml-[0.5rem] font-medium tracking-[0.06em] text-da-label">
-            {STATION.name}
+            {stationName}
           </span>
         </span>
 

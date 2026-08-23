@@ -24,11 +24,16 @@
    ========================================================================== */
 
 :root {
+  /* Operator scale, from Settings → Appearance. Multiplies the whole board
+     rather than any one element, which is the only way to resize a layout that
+     is authored end-to-end in rem without any of its proportions drifting. */
+  --da-ui-scale: 1;
+
   /* 16/1440 = 1.1111vw   |   16/878 = 1.8223vh
      min() of the two keeps the whole board inside the viewport at any aspect
      ratio, so a 4K wall display shows the same layout at 2.46x — never a
      1440-sized island in the corner, and never a scrollbar. */
-  font-size: clamp(13px, min(1.1111vw, 1.8223vh), 48px);
+  font-size: calc(clamp(13px, min(1.1111vw, 1.8223vh), 48px) * var(--da-ui-scale));
   -webkit-text-size-adjust: 100%;
 }
 
@@ -278,7 +283,7 @@
      16/1619 = 0.9883vw   |   16/1066 = 1.5009vh
    ========================================================================== */
 :root:has(.dats-tracking) {
-  font-size: clamp(11px, min(0.9883vw, 1.5009vh), 40px);
+  font-size: calc(clamp(11px, min(0.9883vw, 1.5009vh), 40px) * var(--da-ui-scale));
 }
 
 /* ============================================================================
@@ -376,6 +381,19 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* The same suppression, asked for explicitly in Settings → Appearance rather
+   than inherited from the OS. Duplicated instead of factored so an operator on
+   a machine that has never been told about reduced motion can still ask this
+   board for it — and so the OS preference keeps working with no stored setting
+   at all. */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* ============================================================================

@@ -1,5 +1,6 @@
 "use client";
 
+import { readHomeHref } from "@/features/settings/lib/readPersisted";
 import { authConfig } from "../config";
 import type { AuthResult, Session, StoredUser } from "../types";
 import {
@@ -194,5 +195,6 @@ export function resolveNextPath(next: string | null): string {
   // Only same-origin absolute paths: `next=https://elsewhere` would turn the
   // login screen into an open redirect.
   if (next && next.startsWith("/") && !next.startsWith("//")) return next;
-  return authConfig.homePath;
+  // No explicit destination: land where the operator asked to land.
+  return readHomeHref(authConfig.homePath);
 }

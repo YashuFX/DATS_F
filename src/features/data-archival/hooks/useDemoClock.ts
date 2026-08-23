@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRuntimeConfig } from "@/lib/runtimeConfig";
 import { archivalConfig } from "../config";
 
 /**
@@ -14,7 +15,11 @@ import { archivalConfig } from "../config";
  * Ticking pauses while the tab is hidden so a demo left open overnight does not
  * wake up hours ahead of its own data.
  */
-export function useDemoClock(intervalMs: number = archivalConfig.tickMs): number {
+export function useDemoClock(intervalMs?: number): number {
+  // An explicit argument still wins; without one the clock follows the refresh
+  // interval set in Settings → Console.
+  const configured = useRuntimeConfig().tickMs;
+  const period = intervalMs ?? configured;
   const [now, setNow] = useState(archivalConfig.demoEpoch);
 
   useEffect(() => {
@@ -35,13 +40,13 @@ export function useDemoClock(intervalMs: number = archivalConfig.tickMs): number
     };
 
     tick();
-    const id = window.setInterval(tick, intervalMs);
+    const id = window.setInterval(tick, period);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [intervalMs]);
+  }, [period]);
 
   return now;
 }

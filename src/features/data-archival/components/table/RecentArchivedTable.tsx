@@ -10,9 +10,10 @@ import { Button } from "../ui/Button";
 import { PriorityBadge } from "../ui/Badge";
 import { Card, CardHeader } from "../ui/Card";
 import { useArchivalStore } from "../../store/useArchivalStore";
+import { TimeZoneLabel } from "../ui/TimeZoneLabel";
 
 const COLS = [
-  { key: "time", label: "Time (IST)", width: "7.5rem" },
+  { key: "time", label: <TimeZoneLabel />, width: "7.5rem" },
   { key: "type", label: "Data Type", width: "8.75rem" },
   { key: "source", label: "Source", width: "5.5rem" },
   { key: "mission", label: "Mission / Task", width: "6.5rem" },

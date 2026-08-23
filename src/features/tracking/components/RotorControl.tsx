@@ -1,8 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Settings, ChevronDown } from 'lucide-react';
+import { Settings, ChevronDown, X } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
+
+/** Pre-configured rotor addresses the operator can pick from. */
+const ROTOR_PRESETS = [
+  { label: 'Rotor #1 – Main', value: '192.168.60.97:4533' },
+  { label: 'Rotor #2 – Backup', value: '192.168.60.98:4533' },
+  { label: 'Rotor #3 – Mobile', value: '10.0.1.50:4533' },
+  { label: 'Localhost (dev)', value: '127.0.0.1:4533' },
+];
+
+const PROTOCOL_OPTIONS = ['rotctld', 'GS-232A', 'GS-232B', 'SPID'];
+const STEP_SIZES = [0.1, 0.5, 1.0, 2.0, 5.0];
 
 export default function RotorControl() {
   const {
@@ -15,8 +26,11 @@ export default function RotorControl() {
     setRotorIp,
   } = useDashboard();
 
-  const [ipVal, setIpVal] = useState(rotorIp);
-  const [isEditingIp, setIsEditingIp] = useState(false);
+  // Settings panel
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [protocol, setProtocol] = useState('rotctld');
+  const [port, setPort] = useState('4533');
+  const [stepSize, setStepSize] = useState(1.0);
 
   // CCW / CW / UP / DOWN manual adjustments
   const [manualOffsetAz, setManualOffsetAz] = useState(0);
@@ -29,11 +43,11 @@ export default function RotorControl() {
   const azimuthRotation = displayAz;
 
   const handleAdjustAz = (amount: number) => {
-    setManualOffsetAz(prev => prev + amount);
+    setManualOffsetAz(prev => prev + amount * stepSize);
   };
 
   const handleAdjustEl = (amount: number) => {
-    setManualOffsetEl(prev => prev + amount);
+    setManualOffsetEl(prev => prev + amount * stepSize);
   };
 
   const handlePark = () => {
@@ -62,45 +76,86 @@ export default function RotorControl() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center justify-between bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da px-2.5 py-1 text-[11px] font-mono font-bold text-da-text shadow-inner min-w-0">
-            {isEditingIp ? (
-              <input
-                type="text"
-                value={ipVal}
-                onChange={(e) => setIpVal(e.target.value)}
-                onBlur={() => {
-                  setRotorIp(ipVal);
-                  setIsEditingIp(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setRotorIp(ipVal);
-                    setIsEditingIp(false);
-                  }
-                }}
-                aria-label="Rotor address"
-                className="text-[11px] font-mono font-bold bg-transparent text-da-text focus:outline-none w-full"
-                autoFocus
-              />
-            ) : (
-              <div
-                onClick={() => setIsEditingIp(true)}
-                className="text-[11px] font-mono font-bold text-da-text w-full cursor-pointer flex items-center justify-between"
-              >
-                <span className="truncate">{rotorIp}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-da-muted shrink-0 ml-1" />
-              </div>
-            )}
+            <select
+              value={rotorIp}
+              onChange={(e) => setRotorIp(e.target.value)}
+              aria-label="Select Rotor Address"
+              className="text-[11px] font-mono font-bold bg-transparent text-da-text focus:outline-none w-full cursor-pointer appearance-none"
+            >
+              {ROTOR_PRESETS.map((preset) => (
+                <option key={preset.value} value={preset.value} className="bg-da-surface text-da-text">
+                  {preset.label} ({preset.value})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-da-muted shrink-0 ml-1 pointer-events-none" />
           </div>
 
           <button 
-            onClick={() => setIsEditingIp(true)}
-            aria-label="Edit rotor address"
-            className="p-1.5 rounded-da bg-blue-600 hover:bg-blue-500 text-da-on-brand transition-colors cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 border border-da-info/40 shadow-sm"
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            aria-label="Rotor settings"
+            className={`p-1.5 rounded-da transition-colors cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 border shadow-sm ${
+              settingsOpen
+                ? 'bg-da-info text-da-on-brand border-da-info/60'
+                : 'bg-blue-600 hover:bg-blue-500 text-da-on-brand border-da-info/40'
+            }`}
           >
             <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
+
+      {/* Settings Panel (collapsible) */}
+      {settingsOpen && (
+        <div className="shrink-0 bg-da-bg border border-da-border rounded-da p-2.5 mb-1 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-da-muted">Rotor Settings</span>
+            <button onClick={() => setSettingsOpen(false)} className="text-da-muted hover:text-da-text cursor-pointer">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+
+          {/* Protocol */}
+          <div className="mb-1.5">
+            <label className="text-[9px] font-bold text-da-muted uppercase tracking-wider">Protocol</label>
+            <select
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value)}
+              className="mt-0.5 w-full bg-da-surface border border-da-border rounded-da px-2 py-1 text-[10px] font-mono font-bold text-da-text focus:outline-none cursor-pointer"
+            >
+              {PROTOCOL_OPTIONS.map((p) => (
+                <option key={p} value={p} className="bg-da-surface text-da-text">{p}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Port */}
+          <div className="mb-1.5">
+            <label className="text-[9px] font-bold text-da-muted uppercase tracking-wider">Port</label>
+            <input
+              type="text"
+              value={port}
+              onChange={(e) => setPort(e.target.value)}
+              className="mt-0.5 w-full bg-da-surface border border-da-border rounded-da px-2 py-1 text-[10px] font-mono font-bold text-da-text focus:outline-none"
+              placeholder="4533"
+            />
+          </div>
+
+          {/* Step Size */}
+          <div>
+            <label className="text-[9px] font-bold text-da-muted uppercase tracking-wider">Step Size (°)</label>
+            <select
+              value={stepSize}
+              onChange={(e) => setStepSize(parseFloat(e.target.value))}
+              className="mt-0.5 w-full bg-da-surface border border-da-border rounded-da px-2 py-1 text-[10px] font-mono font-bold text-da-text focus:outline-none cursor-pointer"
+            >
+              {STEP_SIZES.map((s) => (
+                <option key={s} value={s} className="bg-da-surface text-da-text">{s}°</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Enlarged Dials Container with Readouts Directly Underneath */}
       <div className="flex items-center justify-around w-full grow py-1 gap-2 min-h-0">

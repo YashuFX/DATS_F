@@ -21,6 +21,7 @@ import { StatStrip } from "../ui/StatStrip";
 import { LOG_LEVEL_COLOR, LOG_LEVEL_LABEL } from "./logLevels";
 import { LogFilterPanel } from "./LogFilterPanel";
 import { LogLevelBadge } from "./LogLevelBadge";
+import { TimeZoneLabel } from "../ui/TimeZoneLabel";
 
 const facet = (id: string) =>
   SEED_LOG_LEVEL_FACETS.find((f) => f.id === id)?.count ?? 0;
@@ -28,7 +29,7 @@ const facet = (id: string) =>
 const COLUMNS = [
   {
     key: "time",
-    label: "Time (IST)",
+    label: <TimeZoneLabel />,
     width: "5.25rem",
     render: (row: LogEntry) => (
       <span className="da-nums font-medium text-da-muted">{formatClock(row.timestamp)}</span>

@@ -3,6 +3,7 @@
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
+import { useRuntimeConfig } from "@/lib/runtimeConfig";
 import {
   ANTENNAS,
   CATALOGUE,
@@ -100,6 +101,7 @@ export function NewTaskDialog({
   passes: SatellitePass[];
 }) {
   const nowSec = secondsIntoDay(MISSION_EPOCH_MS + elapsedSec * 1000);
+  const stationName = useRuntimeConfig().stationName;
 
   const [satName, setSatName] = useState(CATALOGUE[0]?.name ?? "");
   const [taskType, setTaskType] = useState<TaskType>("Active Track");
@@ -227,7 +229,7 @@ export function NewTaskDialog({
               New tracking task
             </span>
             <span className="mt-[0.1875rem] text-3xs font-medium text-da-muted">
-              {STATION.name} · booked at 1 ms resolution
+              {stationName} · booked at 1 ms resolution
             </span>
           </span>
           <button

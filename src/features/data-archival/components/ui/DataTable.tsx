@@ -3,7 +3,8 @@ import { cn } from "../../lib/cn";
 
 export interface Column<T> {
   key: string;
-  label: string;
+  /** A node, not a string: the time column's label carries the live time zone. */
+  label: ReactNode;
   /** rem width, or "auto" for the single flexible column. */
   width: string;
   align?: "left" | "right";

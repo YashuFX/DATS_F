@@ -24,6 +24,7 @@ import { Button } from "../ui/Button";
 import { Card, CardHeader } from "../ui/Card";
 import { Dot, MeterRow, StatusPill, Tally } from "../ui/StatusBits";
 import { StatStrip } from "../ui/StatStrip";
+import { TimeZoneLabel } from "../ui/TimeZoneLabel";
 
 const SEVERITY_COLOR: Record<SeverityId, string> = {
   critical: "da-danger",
@@ -58,7 +59,7 @@ function SeverityCell({ severity }: { severity: SeverityId }) {
 const COLUMNS = [
   {
     key: "time",
-    label: "Time (IST)",
+    label: <TimeZoneLabel />,
     width: "5.25rem",
     render: (row: AlertRecord) => (
       <span className="da-nums font-medium text-da-muted">{formatClock(row.timestamp)}</span>

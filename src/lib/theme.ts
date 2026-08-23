@@ -43,3 +43,55 @@ export function applyTheme(theme: Theme) {
   }
   window.dispatchEvent(new Event(THEME_EVENT));
 }
+
+/**
+ * The three states the settings screen offers.
+ *
+ * "system" is the absence of a stored choice, not a third stored value — which
+ * is exactly what `THEME_INIT_SCRIPT` above already falls back to, so choosing
+ * it is a `removeItem` and nothing else has to learn a new case.
+ */
+export type ThemeMode = Theme | "system";
+
+/** What the operator chose, as opposed to what is currently painted. */
+export function readThemeMode(): ThemeMode {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === "dark" || stored === "light" ? stored : "system";
+  } catch {
+    return "system";
+  }
+}
+
+/** Apply a mode. "system" clears the choice and follows the OS from now on. */
+export function applyThemeMode(mode: ThemeMode) {
+  if (mode !== "system") {
+    applyTheme(mode);
+    return;
+  }
+  try {
+    localStorage.removeItem(THEME_STORAGE_KEY);
+  } catch {
+    // Nothing to clear — the session default already follows the OS.
+  }
+  document.documentElement.dataset.theme = window.matchMedia(
+    "(prefers-color-scheme: dark)",
+  ).matches
+    ? "dark"
+    : "light";
+  window.dispatchEvent(new Event(THEME_EVENT));
+}
+
+/**
+ * Track the OS preference while — and only while — no explicit choice is stored.
+ * Returns an unsubscribe. Without this, "follow system" would only follow it at
+ * load, and a board left open across a scheduled dark-mode switch would not move.
+ */
+export function watchSystemTheme(): () => void {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => {
+    if (readThemeMode() === "system") applyThemeMode("system");
+  };
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}

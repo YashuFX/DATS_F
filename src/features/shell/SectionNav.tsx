@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
+import { useRuntimeConfig } from "@/lib/runtimeConfig";
 import { SECTIONS, sectionFor } from "./sections";
 
 /**
@@ -28,6 +29,7 @@ export function SectionNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const active = sectionFor(pathname);
+  const { showSectionNav } = useRuntimeConfig();
 
   /*
    * Close on route change — you asked for a section, you got it.
@@ -53,8 +55,9 @@ export function SectionNav() {
   }, [open]);
 
   // Auth screens have nothing to navigate between, and the settings screen
-  // reaches everything through its own back link.
-  if (pathname.startsWith("/auth")) return null;
+  // reaches everything through its own back link. An operator can also retire
+  // the compass entirely from Settings → Console.
+  if (pathname.startsWith("/auth") || !showSectionNav) return null;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[1rem] z-40 flex justify-center">

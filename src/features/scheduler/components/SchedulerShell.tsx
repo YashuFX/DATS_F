@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
 import { SettingsButton } from "@/features/shell/SettingsButton";
-import { PASSES, SCHEDULE_STATS } from "../data/schedule";
 import { loadedConflicts } from "../lib/live";
 import { useSimStore } from "../store/simStore";
 import { SchedulerRuntime } from "./SchedulerRuntime";
@@ -149,33 +148,6 @@ export function SchedulerShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden">{children}</main>
-
-      <footer className="flex h-[2.75rem] shrink-0 items-center justify-between border-t-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem]">
-        <span className="flex items-center gap-[1.5rem]">
-          {[
-            ["Catalogue", `${SCHEDULE_STATS.satelliteCapacity} satellites`],
-            [
-              "Booked",
-              `${new Set(PASSES.slice(0, loadedPassCount).map((p) => p.satName)).size} in window`,
-            ],
-            ["Window", `${SCHEDULE_STATS.windowHours.toFixed(1)} h`],
-            ["Predictor", "SGP4 · GPU"],
-            ["TLE age", "4 h 12 m"],
-          ].map(([label, value]) => (
-            <span key={label} className="flex flex-col leading-none">
-              <span className="text-3xs font-medium uppercase tracking-[0.08em] text-da-label">
-                {label}
-              </span>
-              <span className="da-nums mt-[0.1875rem] text-2xs font-semibold text-da-text">
-                {value}
-              </span>
-            </span>
-          ))}
-        </span>
-        <span className="text-3xs font-medium uppercase tracking-[0.1em] text-da-label">
-          Schedule files emitted at {SCHEDULE_STATS.resolutionMs} ms resolution
-        </span>
-      </footer>
     </div>
   );
 }

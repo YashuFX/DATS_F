@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type RefObject } from "react";
+import { useRuntimeConfig } from "@/lib/runtimeConfig";
 
 /**
  * How many table rows fit in the element the ref points at, right now.
@@ -27,9 +28,13 @@ export function useAutoPageSize(
 ): number {
   const [size, setSize] = useState(fallback);
 
+  // An operator who has pinned a row count in Settings → Console gets that
+  // count, measured or not. Measuring is the better default, not a mandate.
+  const pinned = useRuntimeConfig().tableRows;
+
   useEffect(() => {
     const el = ref.current;
-    if (!enabled || !el) return;
+    if (!enabled || !el || pinned !== "auto") return;
 
     const measure = () => {
       const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
@@ -42,7 +47,7 @@ export function useAutoPageSize(
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [ref, enabled, rowRem, headRem]);
+  }, [ref, enabled, rowRem, headRem, pinned]);
 
-  return size;
+  return pinned === "auto" ? size : Math.max(1, pinned);
 }

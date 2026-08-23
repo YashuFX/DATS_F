@@ -4,42 +4,81 @@ import { archivalConfig } from "../config";
  * All formatters pin an explicit time zone and locale. That is what makes the
  * server render and the client hydration produce byte-identical strings — the
  * usual source of hydration mismatches in a dashboard full of timestamps.
+ *
+ * The zone and the 12/24-hour choice are operator settings, so they are read
+ * from a module-level record rather than baked into a formatter at import.
+ * `SettingsRuntime` writes that record in an effect — after hydration, never
+ * before — so the first client render still matches the server's, and the
+ * change lands on the next tick of the demo clock a moment later.
  */
-const TZ = archivalConfig.timeZone;
 const LOCALE = "en-GB";
 
-const clockFmt = new Intl.DateTimeFormat(LOCALE, {
-  timeZone: TZ,
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
+interface FormatOptions {
+  timeZone: string;
+  hour12: boolean;
+}
 
-const dateFmt = new Intl.DateTimeFormat(LOCALE, {
-  timeZone: TZ,
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-
-const hourFmt = new Intl.DateTimeFormat(LOCALE, {
-  timeZone: TZ,
-  hour: "2-digit",
-  minute: "2-digit",
+let options: FormatOptions = {
+  timeZone: archivalConfig.timeZone,
   hour12: false,
-});
+};
+
+/**
+ * Repoint every formatter in the application.
+ *
+ * Safe to call on every settings change: formatters are rebuilt lazily and
+ * cached by zone, so flipping between two zones does not allocate a new
+ * `Intl.DateTimeFormat` each time — they are expensive enough to matter on a
+ * board that formats several hundred timestamps a second.
+ */
+export function setFormatOptions(next: Partial<FormatOptions>) {
+  options = { ...options, ...next };
+}
+
+export const getFormatOptions = (): FormatOptions => options;
+
+const cache = new Map<string, Intl.DateTimeFormat>();
+
+function fmt(key: string, init: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const id = `${key}|${options.timeZone}|${options.hour12}`;
+  let existing = cache.get(id);
+  if (!existing) {
+    existing = new Intl.DateTimeFormat(LOCALE, {
+      timeZone: options.timeZone,
+      ...init,
+    });
+    cache.set(id, existing);
+  }
+  return existing;
+}
+
+const clockFmt = () =>
+  fmt("clock", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: options.hour12,
+  });
+
+const dateFmt = () =>
+  fmt("date", { day: "2-digit", month: "short", year: "numeric" });
+
+const hourFmt = () =>
+  fmt("hour", { hour: "2-digit", minute: "2-digit", hour12: options.hour12 });
+
+const shortDateFmt = () =>
+  fmt("shortDate", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 const numberFmt = new Intl.NumberFormat("en-US");
 
 /** "18:42:31" */
-export const formatClock = (ts: number) => clockFmt.format(ts);
+export const formatClock = (ts: number) => clockFmt().format(ts);
 
 /** "20 May 2025" */
-export const formatDate = (ts: number) => dateFmt.format(ts).replace(/,/g, "");
+export const formatDate = (ts: number) => dateFmt().format(ts).replace(/,/g, "");
 
 /** "18:00" — activity chart axis. */
-export const formatHour = (ts: number) => hourFmt.format(ts);
+export const formatHour = (ts: number) => hourFmt().format(ts);
 
 /** "20 May 2025 18:40:12" */
 export const formatDateTime = (ts: number) => `${formatDate(ts)} ${formatClock(ts)}`;
@@ -93,13 +132,7 @@ export function formatCountdown(totalSeconds: number): string {
 
 /** "18/05/2025 00:00" — the date-range field. */
 export function formatRangeStamp(ts: number): string {
-  const d = new Intl.DateTimeFormat(LOCALE, {
-    timeZone: TZ,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(ts);
-  return `${d} ${hourFmt.format(ts)}`;
+  return `${shortDateFmt().format(ts)} ${hourFmt().format(ts)}`;
 }
 
 export const formatPercent = (n: number, decimals = 1) => `${n.toFixed(decimals)}%`;
