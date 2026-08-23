@@ -87,77 +87,85 @@ interface DashboardContextType {
   };
 }
 
+/**
+ * The three targets this console tracks — all ISRO spacecraft.
+ *
+ * The migrated console carried YUBILEINY (RS30), the ISS and OSCAR 7, which are
+ * Russian, international and American respectively. This station tracks Indian
+ * satellites, so the catalogue is RISAT-2B, CARTOSAT-3 and RESOURCESAT-2A, with
+ * their real NORAD numbers and orbits.
+ */
 const initialSatellites: Record<SatId, Satellite> = {
   t1: {
     id: 'T1',
-    noradId: '36561',
-    name: 'YUBILEINY (RS30)',
-    shortName: 'YUBILEINY',
-    description: 'YUBILEINY (RS30) - Radio Amateur satellite',
+    noradId: '44233',
+    name: 'RISAT-2B',
+    shortName: 'RISAT-2B',
+    description: 'RISAT-2B - X-band synthetic aperture radar imaging satellite',
     alive: true,
-    countryFlags: ['🇷🇺'],
+    countryFlags: ['🇮🇳'],
     baseAzimuth: 27.2,
     baseElevation: -11.3,
-    baseAltitude: 1490,
-    baseVelocity: 7.21,
-    apogee: 1500.2,
-    perigee: 1480.4,
-    inclination: 98.20,
+    baseAltitude: 557,
+    baseVelocity: 7.58,
+    apogee: 565.4,
+    perigee: 548.9,
+    inclination: 37.00,
     passDuration: '0s',
-    vfo1Uplink: '145.825 MHz',
-    vfo2Downlink: '435.325 MHz',
-    vfo1Freq: '145.825.000',
-    vfo2Freq: '435.325.000',
+    vfo1Uplink: '2071.875 MHz',
+    vfo2Downlink: '8212.500 MHz',
+    vfo1Freq: '2.071.875.000',
+    vfo2Freq: '8.212.500.000',
   },
   t2: {
     id: 'T2',
-    noradId: '25544',
-    name: 'ISS (ZARYA)',
-    shortName: 'ISS (ZARYA)',
-    description: 'ISS (ZARYA) - International Space Station',
+    noradId: '44804',
+    name: 'CARTOSAT-3',
+    shortName: 'CARTOSAT-3',
+    description: 'CARTOSAT-3 - High-resolution Earth observation satellite',
     alive: true,
-    countryFlags: ['🇷🇺', '🇺🇸'],
+    countryFlags: ['🇮🇳'],
     baseAzimuth: 306.5,
     baseElevation: 9.7,
-    baseAltitude: 427,
-    baseVelocity: 7.66,
-    apogee: 429.1,
-    perigee: 417.6,
-    inclination: 98.12,
+    baseAltitude: 509,
+    baseVelocity: 7.61,
+    apogee: 512.3,
+    perigee: 504.8,
+    inclination: 97.50,
     passDuration: '8m 54s',
-    vfo1Uplink: '145.987 MHz',
-    vfo2Downlink: '437.810 MHz',
-    vfo1Freq: '145.986.689',
-    vfo2Freq: '437.809.928',
+    vfo1Uplink: '2101.800 MHz',
+    vfo2Downlink: '8300.000 MHz',
+    vfo1Freq: '2.101.800.000',
+    vfo2Freq: '8.299.999.928',
   },
   t3: {
     id: 'T3',
-    noradId: '07530',
-    name: 'OSCAR 7 (AO-7)',
-    shortName: 'OSCAR 7',
-    description: 'OSCAR 7 (AO-7) - Phase IIB amateur satellite',
+    noradId: '41877',
+    name: 'RESOURCESAT-2A',
+    shortName: 'RESOURCESAT-2A',
+    description: 'RESOURCESAT-2A - Multispectral land and water resources imager',
     alive: true,
-    countryFlags: ['🇺🇸'],
+    countryFlags: ['🇮🇳'],
     baseAzimuth: 222.6,
     baseElevation: 26.3,
-    baseAltitude: 1450,
-    baseVelocity: 7.15,
-    apogee: 1461.5,
-    perigee: 1442.3,
-    inclination: 101.82,
+    baseAltitude: 817,
+    baseVelocity: 7.44,
+    apogee: 823.7,
+    perigee: 810.2,
+    inclination: 98.72,
     passDuration: '14m 20s',
-    vfo1Uplink: '145.975 MHz',
-    vfo2Downlink: '29.400 MHz',
-    vfo1Freq: '145.975.120',
-    vfo2Freq: '29.400.085',
+    vfo1Uplink: '2087.500 MHz',
+    vfo2Downlink: '8125.000 MHz',
+    vfo1Freq: '2.087.500.000',
+    vfo2Freq: '8.125.000.085',
   },
 };
 
 const initialEvents: TrackEvent[] = [
-  { time: '09:03:00.124', id: 'TRK-0248', name: 'YUBILEINY', status: 'locked', message: 'LOCK ACQUIRED' },
-  { time: '09:02:58.771', id: 'TRK-0250', name: 'ISS (ZARYA)', status: 'detected', message: 'DETECTED' },
-  { time: '09:02:51.362', id: 'TRK-0248', name: 'YUBILEINY', status: 'locked', message: 'TELEMETRY DECODED' },
-  { time: '09:02:44.219', id: 'TRK-0251', name: 'OSCAR 7', status: 'tentative', message: 'ASSOCIATION CONFIRMED' },
+  { time: '09:03:00.124', id: 'TRK-0248', name: 'RISAT-2B', status: 'locked', message: 'LOCK ACQUIRED' },
+  { time: '09:02:58.771', id: 'TRK-0250', name: 'CARTOSAT-3', status: 'detected', message: 'DETECTED' },
+  { time: '09:02:51.362', id: 'TRK-0248', name: 'RISAT-2B', status: 'locked', message: 'TELEMETRY DECODED' },
+  { time: '09:02:44.219', id: 'TRK-0251', name: 'RESOURCESAT-2A', status: 'tentative', message: 'ASSOCIATION CONFIRMED' },
   { time: '09:02:40.115', id: 'TRK-0242', name: 'UNKNOWN', status: 'lost', message: 'TRACK LOST' },
 ];
 
@@ -297,7 +305,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       // Randomly trigger new track events
       if (Math.random() < 0.05) {
         const targetIds = ['TRK-0248', 'TRK-0250', 'TRK-0249', 'TRK-0251', 'TRK-0242'];
-        const targetNames = ['YUBILEINY', 'ISS (ZARYA)', 'TRK-0249', 'OSCAR 7', 'TRK-0242'];
+        const targetNames = ['RISAT-2B', 'CARTOSAT-3', 'TRK-0249', 'RESOURCESAT-2A', 'TRK-0242'];
         const statuses: ('locked' | 'detected' | 'tentative' | 'lost' | 'unknown')[] = [
           'locked', 'detected', 'tentative', 'lost', 'unknown'
         ];

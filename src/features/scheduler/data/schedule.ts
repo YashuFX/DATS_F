@@ -29,14 +29,20 @@ function makeRng(seed: number) {
   };
 }
 
-/** The stations this scheduler books against. */
+/**
+ * The stations this scheduler books against — all ISRO sites on Indian soil.
+ *
+ * The overseas ISTRAC station at Brunei was dropped and Hassan (MCF) put in its
+ * place, and BYL was relabelled: it is Byalalu, the Indian Deep Space Network
+ * site outside Bengaluru, not a terminal at Bhopal.
+ */
 export const STATIONS: GroundStation[] = [
   { id: "BLR", name: "Bengaluru (ISTRAC)", latDeg: 13.0389, lonDeg: 77.5124 },
   { id: "SHAR", name: "Sriharikota (SDSC)", latDeg: 13.7259, lonDeg: 80.2266 },
-  { id: "PBR", name: "Port Blair", latDeg: 11.6234, lonDeg: 92.7265 },
-  { id: "BRU", name: "Brunei Station", latDeg: 4.8872, lonDeg: 114.9333 },
-  { id: "LKN", name: "Lucknow (NRSA)", latDeg: 26.8467, lonDeg: 80.9462 },
-  { id: "BYL", name: "Bhopal Terminal", latDeg: 23.2599, lonDeg: 77.4126 },
+  { id: "PBR", name: "Port Blair (ISTRAC)", latDeg: 11.6234, lonDeg: 92.7265 },
+  { id: "HSN", name: "Hassan (MCF)", latDeg: 13.0072, lonDeg: 76.0962 },
+  { id: "LKN", name: "Lucknow (ISTRAC)", latDeg: 26.8467, lonDeg: 80.9462 },
+  { id: "BYL", name: "Byalalu (IDSN)", latDeg: 12.9500, lonDeg: 77.3700 },
 ];
 
 /**
@@ -49,7 +55,7 @@ export const ANTENNAS: Antenna[] = [
   { id: "SHAR-ANT-01", stationId: "SHAR" },
   { id: "SHAR-ANT-02", stationId: "SHAR" },
   { id: "PBR-ANT-01", stationId: "PBR" },
-  { id: "BRU-ANT-01", stationId: "BRU" },
+  { id: "HSN-ANT-01", stationId: "HSN" },
   { id: "LKN-ANT-01", stationId: "LKN" },
   { id: "BYL-ANT-01", stationId: "BYL" },
 ];
@@ -115,7 +121,8 @@ export const PASSES: SatellitePass[] = (() => {
     const sat = CATALOGUE[Math.floor(rng() * CATALOGUE.length)];
     const antenna = ANTENNAS[i % ANTENNAS.length];
     const durationSec = 360 + Math.floor(rng() * 780);
-    const gap = 120 + Math.floor(rng() * 900);
+    // Real passes are minutes long and hours apart, so the gap dominates.
+    const gap = 900 + Math.floor(rng() * 2400);
     const start = (nextFree.get(antenna.id) ?? 0) + gap;
 
     // Two deliberate double-bookings, so the conflict path is exercised.

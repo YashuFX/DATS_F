@@ -178,18 +178,19 @@ export function TaskHistoryScreen() {
     );
 
   const COLUMNS: { key: string; label: string; sort?: SortKey; width: string; align?: "right" }[] = [
-    { key: "id", label: "Acq ID", width: "6rem" },
-    { key: "sat", label: "Satellite", sort: "satName", width: "auto" },
-    { key: "antenna", label: "Antenna", width: "7rem" },
-    { key: "aos", label: "AOS (UTC)", width: "10.5rem" },
-    { key: "completed", label: "Completed (UTC)", sort: "completedAt", width: "10.5rem" },
-    { key: "duration", label: "Duration", sort: "durationSec", width: "5.5rem" },
-    { key: "el", label: "Max El", width: "4.5rem", align: "right" },
-    { key: "lock", label: "Link Lock", width: "6rem" },
-    { key: "downlink", label: "Downlinked", width: "6.5rem", align: "right" },
-    { key: "eff", label: "Efficiency", sort: "efficiencyPct", width: "5.75rem", align: "right" },
-    { key: "priority", label: "Priority", sort: "priority", width: "5.5rem" },
-    { key: "issues", label: "Issues", width: "13rem" },
+    { key: "id", label: "Acq ID", width: "5.5rem" },
+    { key: "sat", label: "Satellite", sort: "satName", width: "8.5rem" },
+    { key: "antenna", label: "Antenna", width: "6rem" },
+    // AOS carries time only — the date is already on the Completed column.
+    { key: "aos", label: "AOS", width: "4.75rem" },
+    { key: "completed", label: "Completed (UTC)", sort: "completedAt", width: "9.25rem" },
+    { key: "duration", label: "Duration", sort: "durationSec", width: "5rem" },
+    { key: "el", label: "Max El", width: "4.25rem", align: "right" },
+    { key: "lock", label: "Link Lock", width: "5.25rem" },
+    { key: "downlink", label: "Downlinked", width: "5.5rem", align: "right" },
+    { key: "eff", label: "Efficiency", sort: "efficiencyPct", width: "5rem", align: "right" },
+    { key: "priority", label: "Priority", sort: "priority", width: "5rem" },
+    { key: "issues", label: "Issues", width: "10rem" },
   ];
 
   return (
@@ -312,7 +313,7 @@ export function TaskHistoryScreen() {
           <table className="w-full table-fixed border-collapse">
             <colgroup>
               {COLUMNS.map((c) => (
-                <col key={c.key} style={c.width === "auto" ? undefined : { width: c.width }} />
+                <col key={c.key} style={{ width: c.width }} />
               ))}
             </colgroup>
             <thead>
@@ -375,7 +376,7 @@ export function TaskHistoryScreen() {
                       {r.pass.antennaId}
                     </td>
                     <td className="da-nums px-[0.625rem] text-2xs font-medium text-da-muted">
-                      {utc(r.aosAt)}
+                      {new Date(r.aosAt).toISOString().slice(11, 19)}
                     </td>
                     <td className="da-nums px-[0.625rem] text-2xs font-medium text-da-muted">
                       {utc(r.completedAt)}

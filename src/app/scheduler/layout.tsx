@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthGuard } from "@/features/auth";
 import { SchedulerShell } from "@/features/scheduler";
 
 export const metadata: Metadata = {
@@ -8,6 +9,8 @@ export const metadata: Metadata = {
 
 export default function SchedulerLayout({ children }: LayoutProps<"/scheduler">) {
   return (
-    <SchedulerShell>{children}</SchedulerShell>
+    <AuthGuard>
+      <SchedulerShell>{children}</SchedulerShell>
+    </AuthGuard>
   );
 }

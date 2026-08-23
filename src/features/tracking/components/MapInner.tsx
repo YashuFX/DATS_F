@@ -83,7 +83,7 @@ export default function MapInner() {
         [13.07, 77.33],
         [13.04, 77.28]
       ] as L.LatLngTuple[],
-      activeSatId: 't3', // OSCAR 7
+      activeSatId: 't3', // RESOURCESAT-2A
     },
     {
       id: 'TRK-0251',
@@ -98,7 +98,7 @@ export default function MapInner() {
         [12.55, 77.80],
         [12.65, 77.68]
       ] as L.LatLngTuple[],
-      activeSatId: 't1', // YUBILEINY
+      activeSatId: 't1', // RISAT-2B
     },
     {
       id: 'TRK-0242',

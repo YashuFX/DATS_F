@@ -16,6 +16,18 @@ const SCREENS = [
     status: "Built",
   },
   {
+    href: "/scheduler",
+    name: "Pass Scheduler",
+    detail: "Multi-satellite pass prediction, antenna booking and conflicts",
+    status: "Built",
+  },
+  {
+    href: "/task-history",
+    name: "Task History",
+    detail: "Completed pass log, issues encountered and compliance records",
+    status: "Built",
+  },
+  {
     href: "/monitor/array",
     name: "Array Monitor",
     detail: "Subarray tiles — element health, calibration and beam loading",
