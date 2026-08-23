@@ -23,12 +23,14 @@ import { useSimStore } from "../store/simStore";
 export function SchedulerRuntime() {
   const paused = useSimStore((s) => s.paused);
   const speed = useSimStore((s) => s.speed);
+  const initState = useSimStore((s) => s.initState);
 
   useArchiveRehydration();
 
-  /* The clock. */
+  /* The clock. Held until the health check has passed — a cold console has no
+     schedule to advance. */
   useEffect(() => {
-    if (paused) return;
+    if (paused || initState !== "ready") return;
 
     // 20 Hz. A one-second tick moves every task a whole second's worth of
     // distance at once, which reads as a stutter — most visibly at 20x, where
@@ -46,7 +48,7 @@ export function SchedulerRuntime() {
     }, STEP_MS);
 
     return () => window.clearInterval(id);
-  }, [paused, speed]);
+  }, [paused, speed, initState]);
 
   /* The archive watch. */
   useEffect(() => {
@@ -56,6 +58,16 @@ export function SchedulerRuntime() {
      * are watching are logged — the rest are history that predates this run.
      */
     let seen: Set<string> | null = null;
+
+    /**
+     * This console session. Generated here rather than at module scope so it is
+     * created on the client only, well after hydration, and so each tab gets
+     * its own — two tabs watching the same schedule are two observations.
+     */
+    const runId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : String(Date.now());
 
     const settle = (elapsedSec: number) => {
       const finished = PASSES.map((pass) =>
@@ -72,7 +84,7 @@ export function SchedulerRuntime() {
         seen.add(pass.id);
         usePassHistoryStore
           .getState()
-          .archivePass(pass, MISSION_EPOCH_MS + elapsedSec * 1000);
+          .archivePass(pass, MISSION_EPOCH_MS + elapsedSec * 1000, runId);
       }
     };
 

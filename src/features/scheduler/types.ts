@@ -74,6 +74,14 @@ export interface SatellitePass {
 /** One finished pass, as J.1.4 requires it to be logged. */
 export interface PassRecord {
   pass: SatellitePass;
+  /**
+   * Which observation of which booking produced this record, as
+   * `<runId>:<taskId>`. Present on records the console archived; absent on the
+   * shipped log. It exists so the archive can tell "the same completion seen
+   * twenty times in one second" — which must be logged once — from "the same
+   * booking flown again in a later run", which is a second, genuine record.
+   */
+  sourceKey?: string;
   /** Epoch ms. */
   completedAt: number;
   aosAt: number;

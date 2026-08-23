@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Power } from "lucide-react";
 import { cn } from "@/features/data-archival/lib/cn";
-import { ANTENNAS } from "../data/schedule";
+import { ANTENNAS, STATION } from "../data/schedule";
 import type { SatellitePass } from "../types";
 
 /**
@@ -25,10 +26,13 @@ export function TimelineViewport({
   passes,
   selectedPassId,
   onSelectPass,
+  cold = false,
 }: {
   passes: SatellitePass[];
   selectedPassId: string;
   onSelectPass: (id: string) => void;
+  /** True before the health check has run: there is no schedule yet, by design. */
+  cold?: boolean;
 }) {
   const [zoomMin, setZoomMin] = useState(120);
   const [panOffsetMin, setPanOffsetMin] = useState(0);
@@ -104,7 +108,10 @@ export function TimelineViewport({
       {/* Viewport controls */}
       <div className="mb-[0.625rem] flex shrink-0 items-center justify-between gap-[0.75rem] border-b-[max(1px,0.0625rem)] border-da-border pb-[0.625rem]">
         <span className="text-2xs font-bold uppercase tracking-[0.14em] text-da-text">
-          Aperture Antenna Timeline
+          Aperture Timeline
+          <span className="ml-[0.5rem] font-medium tracking-[0.06em] text-da-label">
+            {STATION.name}
+          </span>
         </span>
 
         <div className="flex items-center gap-[0.625rem]">
@@ -157,7 +164,6 @@ export function TimelineViewport({
 
       {/* Ruler */}
       <div className="flex h-[1.75rem] shrink-0 overflow-hidden border-b-[max(1px,0.0625rem)] border-da-border bg-da-subtle/40">
-        <span className="h-full w-[7.5rem] shrink-0 border-r-[max(1px,0.0625rem)] border-da-border bg-da-subtle/60" />
         <div className="relative h-full flex-1">
           <span
             className="absolute inset-y-0 z-10 w-[max(2px,0.125rem)] bg-da-brand"
@@ -173,7 +179,14 @@ export function TimelineViewport({
             tick.leftPct < 0 || tick.leftPct > 100 ? null : (
               <span
                 key={tick.offsetSec}
-                className="absolute bottom-0 flex -translate-x-1/2 flex-col items-center"
+                className={cn(
+                  "absolute bottom-0 flex flex-col items-center",
+                  tick.leftPct < 3
+                    ? "translate-x-0"
+                    : tick.leftPct > 97
+                      ? "-translate-x-full"
+                      : "-translate-x-1/2",
+                )}
                 style={{ left: `${tick.leftPct}%` }}
               >
                 <span className="da-nums mb-[0.1875rem] text-[0.5rem] font-medium leading-none text-da-label">
@@ -186,14 +199,41 @@ export function TimelineViewport({
         </div>
       </div>
 
-      {/* Swimlanes — one per antenna */}
+      {/*
+        Swimlanes.
+
+        There is no lane label column any more, and no lane names: the console
+        drives one aperture, so a row does not identify a dish. Rows exist only
+        so overlapping bookings stay visually separable — the lane a task sits
+        in carries no meaning an operator needs to read.
+      */}
       <div className="relative min-h-0 flex-1 overflow-y-auto border-b-[max(1px,0.0625rem)] border-da-border">
         <span
           className="pointer-events-none absolute inset-y-0 z-10 w-[max(1px,0.0625rem)] bg-da-brand/25"
-          style={{
-            left: `calc(7.5rem + ${PLAYHEAD_PERCENT}% * (100% - 7.5rem) / 100%)`,
-          }}
+          style={{ left: `${PLAYHEAD_PERCENT}%` }}
         />
+
+        {/*
+          A cold console has no schedule — say so, rather than leaving eight
+          empty lanes that read as a failure to load.
+        */}
+        {cold && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-da-bg/70">
+            <span className="flex flex-col items-center gap-[0.375rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-dashed border-da-border bg-da-surface px-[1.5rem] py-[1rem]">
+              <Power
+                className="size-[1.125rem] text-da-label"
+                strokeWidth={1.9}
+              />
+              <span className="text-2xs font-bold uppercase tracking-[0.12em] text-da-muted">
+                Console not initialized
+              </span>
+              <span className="max-w-[22rem] text-center text-2xs font-medium leading-[1.5] text-da-label">
+                No tasks are booked until the subsystem health check has passed.
+                Run Initialize to bring the schedule up.
+              </span>
+            </span>
+          </div>
+        )}
 
         {ANTENNAS.map((antenna) => {
           const lane = passes.filter((p) => p.antennaId === antenna.id);
@@ -202,16 +242,6 @@ export function TimelineViewport({
               key={antenna.id}
               className="relative flex h-[3rem] items-center border-b-[max(1px,0.0625rem)] border-da-border/40 transition-colors hover:bg-da-subtle/30"
             >
-              {/* Lane header */}
-              <div className="z-20 flex h-full w-[7.5rem] shrink-0 flex-col justify-center border-r-[max(1px,0.0625rem)] border-da-border bg-da-bg pl-[0.625rem]">
-                <span className="da-nums text-3xs font-bold uppercase tracking-[0.1em] text-da-muted">
-                  {antenna.id}
-                </span>
-                <span className="mt-[0.125rem] text-[0.5rem] font-medium uppercase tracking-[0.08em] text-da-label">
-                  Aperture scan
-                </span>
-              </div>
-
               {/* Lane track */}
               <div
                 className="relative h-full flex-1 overflow-hidden"
@@ -281,7 +311,7 @@ export function TimelineViewport({
                       key={pass.id}
                       type="button"
                       onClick={() => onSelectPass(pass.id)}
-                      title={`${pass.satName} · ${pass.antennaId}`}
+                      title={`${pass.satName} · ${Math.round(pass.durationSec / 60)}m · el ${pass.maxElevationDeg}°`}
                       className={cn(
                         "absolute inset-y-[0.5rem] z-[5] cursor-pointer overflow-hidden rounded-[0.1875rem] border-[max(1px,0.0625rem)] px-[0.3125rem] text-left transition-colors",
                         selected &&

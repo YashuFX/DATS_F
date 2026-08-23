@@ -2,8 +2,8 @@
 
 import { Terminal, Zap } from "lucide-react";
 import { cn } from "@/features/data-archival/lib/cn";
-import { CONFLICTS, STATIONS } from "../data/schedule";
-import type { LogEntry, SatellitePass } from "../types";
+
+import type { Conflict, LogEntry, SatellitePass } from "../types";
 
 /**
  * BOTTOM DECK — the console's persistent action centre.
@@ -134,13 +134,14 @@ function CommandUplink({ logs }: { logs: LogEntry[] }) {
 export function BottomDeck({
   activePass,
   logs,
+  conflicts,
   onAutoResolve,
 }: {
   activePass: SatellitePass | null;
   logs: LogEntry[];
+  conflicts: Conflict[];
   onAutoResolve: () => void;
 }) {
-  const station = STATIONS.find((s) => s.id === activePass?.stationId);
   const elapsed = activePass ? -activePass.aosOffsetSec : 0;
   const progress =
     activePass && activePass.status === "TRACKING"
@@ -159,11 +160,11 @@ export function BottomDeck({
         {/* Contention banner */}
         <div className="flex shrink-0 items-center justify-between gap-[0.75rem] border-b-[max(1px,0.0625rem)] border-da-border/60 pb-[0.4375rem]">
           <span className="flex min-w-0 items-center gap-[0.875rem]">
-            {CONFLICTS.length > 0 ? (
+            {conflicts.length > 0 ? (
               <span className="flex shrink-0 items-center gap-[0.375rem]">
                 <span className="size-[0.375rem] animate-pulse rounded-full bg-da-danger" />
                 <span className="text-2xs font-bold uppercase tracking-[0.08em] text-da-danger">
-                  {CONFLICTS.length} antenna contention
+                  {conflicts.length} aperture contention
                 </span>
               </span>
             ) : (
@@ -177,7 +178,8 @@ export function BottomDeck({
 
             {activePass && (
               <span className="da-nums truncate text-2xs font-medium text-da-muted">
-                {activePass.id} · {activePass.satName} · {station?.name}
+                {activePass.id} · {activePass.satName} · NORAD{" "}
+                {activePass.noradId}
               </span>
             )}
           </span>

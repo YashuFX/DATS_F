@@ -47,10 +47,29 @@ function noise(seed: string): () => number {
   };
 }
 
+/**
+ * The next acquisition id in sequence.
+ *
+ * Archived records get their own id rather than reusing the scheduler's task
+ * id, for the same reason a real log does: the task id names a *booking*, which
+ * recurs, while an acquisition id names one occasion on which that booking was
+ * flown. Reusing the booking id would put two rows called PASS-005 in a
+ * compliance log.
+ */
+function nextAcqId(records: PassRecord[]): string {
+  const highest = records.reduce((max, record) => {
+    const n = Number(/^ACQ-(\d+)$/.exec(record.pass.id)?.[1]);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 4820);
+  return `ACQ-${String(highest + 1).padStart(4, "0")}`;
+}
+
 /** Turn a pass that has just run its course into the record J.1.4 wants logged. */
 export function recordFor(
   pass: SatellitePass,
   completedAtMs: number,
+  acqId: string,
+  sourceKey: string,
 ): PassRecord {
   const rng = noise(pass.id);
 
@@ -79,8 +98,10 @@ export function recordFor(
   return {
     pass: {
       ...pass,
+      id: acqId,
       status: pass.linkLock === "UNLOCKED" ? "MISSED" : "COMPLETED",
     },
+    sourceKey,
     completedAt: completedAtMs,
     aosAt: completedAtMs - pass.durationSec * 1000,
     issues,
@@ -92,8 +113,18 @@ export function recordFor(
 
 interface PassHistoryState {
   records: PassRecord[];
-  /** Hand a finished pass to the archive. Ignored if that pass is already logged. */
-  archivePass: (pass: SatellitePass, completedAtMs: number) => void;
+  /**
+   * Hand a finished pass to the archive.
+   *
+   * `runId` identifies the console session that observed the completion.
+   * Together with the task id it makes the call idempotent within a run while
+   * still letting a later run log the same booking again.
+   */
+  archivePass: (
+    pass: SatellitePass,
+    completedAtMs: number,
+    runId: string,
+  ) => void;
   /** Empty the archive. It refills as tasks complete. */
   clearHistory: () => void;
 }
@@ -109,20 +140,24 @@ export const usePassHistoryStore = create<PassHistoryState>()(
        */
       records: HISTORY,
 
-      archivePass: (pass, completedAtMs) =>
-        set((state) =>
+      archivePass: (pass, completedAtMs, runId) =>
+        set((state) => {
           // The clock ticks at 20 Hz, so the same completion is observed on
-          // several consecutive frames. The id check is what makes archiving
-          // idempotent rather than logging one pass twenty times a second.
-          state.records.some((r) => r.pass.id === pass.id)
-            ? state
-            : {
-                records: [
-                  recordFor(pass, completedAtMs),
-                  ...state.records,
-                ].slice(0, MAX_RECORDS),
-              },
-        ),
+          // several consecutive frames — and, once the archive is persisted, on
+          // every later reload of the same schedule. Keying on the run makes
+          // the first case log once and the second log a fresh record.
+          const sourceKey = `${runId}:${pass.id}`;
+          if (state.records.some((r) => r.sourceKey === sourceKey))
+            return state;
+
+          const record = recordFor(
+            pass,
+            completedAtMs,
+            nextAcqId(state.records),
+            sourceKey,
+          );
+          return { records: [record, ...state.records].slice(0, MAX_RECORDS) };
+        }),
 
       clearHistory: () => set({ records: [] }),
     }),

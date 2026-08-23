@@ -3,13 +3,8 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
-import {
-  CONFLICTS,
-  PRIORITY_LABEL,
-  PRIORITY_TOKEN,
-  STATIONS,
-} from "../data/schedule";
-import type { SatellitePass } from "../types";
+import { PRIORITY_LABEL, PRIORITY_TOKEN, STATIONS } from "../data/schedule";
+import type { Conflict, SatellitePass } from "../types";
 
 /**
  * OPPORTUNITY EXPLORER — the console's right-hand sidebar.
@@ -22,10 +17,12 @@ export function ConstellationExplorer({
   passes,
   selectedPassId,
   onSelectPass,
+  conflicts,
 }: {
   passes: SatellitePass[];
   selectedPassId: string;
   onSelectPass: (id: string) => void;
+  conflicts: Conflict[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(
     new Set(["SSO", "GEO"]),
@@ -39,7 +36,7 @@ export function ConstellationExplorer({
     return out;
   }, [passes]);
 
-  const contended = new Set(CONFLICTS.flatMap((c) => c.passIds));
+  const contended = new Set(conflicts.flatMap((c) => c.passIds));
   const toggle = (cat: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -62,7 +59,7 @@ export function ConstellationExplorer({
               : "border-da-success/30 bg-da-success-soft text-da-success",
           )}
         >
-          {contended.size ? `${CONFLICTS.length} contended` : "Nominal"}
+          {contended.size ? `${conflicts.length} contended` : "Nominal"}
         </span>
       </header>
 
@@ -155,7 +152,7 @@ export function ConstellationExplorer({
 
                       <span className="flex items-center justify-between gap-[0.375rem] text-3xs">
                         <span className="da-nums truncate font-medium text-da-muted">
-                          {pass.antennaId} · el {pass.maxElevationDeg}°
+                          NORAD {pass.noradId} · el {pass.maxElevationDeg}°
                         </span>
                         <span className="da-nums shrink-0 font-medium text-da-label">
                           {Math.round(pass.durationSec / 60)}m

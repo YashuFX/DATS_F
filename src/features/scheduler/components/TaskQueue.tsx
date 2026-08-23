@@ -28,12 +28,15 @@ export function TaskQueue({
   selectedPassId,
   onSelectPass,
   speed,
+  cold = false,
 }: {
   passes: SatellitePass[];
   selectedPassId: string;
   onSelectPass: (id: string) => void;
   /** Simulation rate, so the acknowledgement lasts a fixed wall-clock time. */
   speed: number;
+  /** True before the health check has run. */
+  cold?: boolean;
 }) {
   /**
    * Whether a task finished recently enough to still be acknowledging.
@@ -131,7 +134,7 @@ export function TaskQueue({
 
             <span className="flex items-center justify-between gap-[0.375rem] text-[0.5rem]">
               <span className="da-nums truncate font-medium text-da-label">
-                {pass.antennaId}
+                {pass.orbitClass} · {Math.round(pass.durationSec / 60)}m
               </span>
               <span
                 className="shrink-0 font-bold uppercase"
@@ -177,7 +180,7 @@ export function TaskQueue({
 
         {passes.length === 0 && (
           <span className="mt-[0.5rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-dashed border-da-border p-[0.75rem] text-center text-3xs uppercase tracking-[0.08em] text-da-label">
-            Queue empty
+            {cold ? "Awaiting initialization" : "Queue empty"}
           </span>
         )}
       </div>

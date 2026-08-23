@@ -1,4 +1,5 @@
-import type { LogEntry, SatellitePass } from "../types";
+import { CONFLICTS, PASSES } from "../data/schedule";
+import type { Conflict, LogEntry, SatellitePass } from "../types";
 
 /** Mission epoch. Fixed, so server and client render the same clock. */
 export const MISSION_EPOCH_MS = Date.parse("2026-08-23T09:00:00Z");
@@ -48,7 +49,20 @@ export function completionLog(
     level: pass.linkLock === "UNLOCKED" ? "WARN" : "ACQ",
     message:
       pass.linkLock === "UNLOCKED"
-        ? `LOS — ${pass.satName} ended unlocked on ${pass.antennaId}, no data recovered`
-        : `LOS — ${pass.satName} complete on ${pass.antennaId}, ${pass.downlinkedMb} MB archived`,
+        ? `LOS — ${pass.satName} ended unlocked, no data recovered`
+        : `LOS — ${pass.satName} complete, ${pass.downlinkedMb} MB archived`,
   };
+}
+
+/**
+ * The contentions that exist right now.
+ *
+ * A conflict is a property of two bookings, so it cannot be reported until both
+ * of them have loaded. On a cold console that means none — which is the point:
+ * a station with no schedule has nothing to contend over, and the header saying
+ * "2 conflicts" over an empty timeline was simply false.
+ */
+export function loadedConflicts(loadedPassCount: number): Conflict[] {
+  const loaded = new Set(PASSES.slice(0, loadedPassCount).map((pass) => pass.id));
+  return CONFLICTS.filter((conflict) => conflict.passIds.every((id) => loaded.has(id)));
 }

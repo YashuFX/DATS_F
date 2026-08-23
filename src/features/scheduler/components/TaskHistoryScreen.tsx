@@ -293,7 +293,6 @@ export function TaskHistoryScreen() {
         term === "" ||
         r.pass.satName.toLowerCase().includes(term) ||
         r.pass.id.toLowerCase().includes(term) ||
-        r.pass.antennaId.toLowerCase().includes(term) ||
         String(r.pass.noradId).includes(term);
       const matchesPriority =
         priority === "ALL" || r.pass.priority === priority;
@@ -362,8 +361,7 @@ export function TaskHistoryScreen() {
     align?: "right";
   }[] = [
     { key: "id", label: "Acq ID", width: "5.5rem" },
-    { key: "sat", label: "Satellite", sort: "satName", width: "8.5rem" },
-    { key: "antenna", label: "Antenna", width: "6rem" },
+    { key: "sat", label: "Satellite", sort: "satName", width: "10.5rem" },
     // AOS carries time only — the date is already on the Completed column.
     { key: "aos", label: "AOS", width: "4.75rem" },
     {
@@ -384,7 +382,7 @@ export function TaskHistoryScreen() {
       align: "right",
     },
     { key: "priority", label: "Priority", sort: "priority", width: "5rem" },
-    { key: "issues", label: "Issues", width: "10rem" },
+    { key: "issues", label: "Issues", width: "14rem" },
   ];
 
   return (
@@ -401,7 +399,7 @@ export function TaskHistoryScreen() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Satellite, acquisition ID, antenna, NORAD…"
+              placeholder="Satellite, acquisition ID, NORAD…"
               className="h-full w-full rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border bg-da-field pl-[1.875rem] pr-[0.5rem] text-2xs text-da-text placeholder:text-da-label focus:border-da-brand focus:outline-none"
             />
           </label>
@@ -617,9 +615,6 @@ export function TaskHistoryScreen() {
                       </span>
                     </td>
                     <td className="da-nums px-[0.625rem] text-2xs font-medium text-da-muted">
-                      {r.pass.antennaId}
-                    </td>
-                    <td className="da-nums px-[0.625rem] text-2xs font-medium text-da-muted">
                       {new Date(r.aosAt).toISOString().slice(11, 19)}
                     </td>
                     <td className="da-nums px-[0.625rem] text-2xs font-medium text-da-muted">
@@ -775,7 +770,7 @@ export function TaskHistoryScreen() {
                     {selected.pass.id} · NORAD {selected.pass.noradId}
                   </span>
                   <span className="text-3xs font-medium uppercase tracking-[0.06em] text-da-label">
-                    {station?.name} · {selected.pass.antennaId}
+                    {station?.name}
                   </span>
                 </span>
 
