@@ -15,10 +15,11 @@ export {
   CATALOGUE,
   CONFLICTS,
   HISTORY,
-  HISTORY_STATS,
   PASSES,
   SCHEDULE_STATS,
   STATIONS,
+  statsFor,
   WINDOW,
 } from "./data/schedule";
+export { usePassHistoryStore } from "./store/passHistoryStore";
 export * from "./types";

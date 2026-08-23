@@ -19,7 +19,13 @@ import { useEffect, useState } from "react";
  * not wake up hours ahead of its own schedule, and the value starts at 0 on the
  * server and on first client render so hydration matches before anything moves.
  */
-export function useSimClock({ paused, speed }: { paused: boolean; speed: number }): number {
+export function useSimClock({
+  paused,
+  speed,
+}: {
+  paused: boolean;
+  speed: number;
+}): number {
   const [elapsedSec, setElapsedSec] = useState(0);
 
   useEffect(() => {

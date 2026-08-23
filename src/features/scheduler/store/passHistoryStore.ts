@@ -48,7 +48,10 @@ function noise(seed: string): () => number {
 }
 
 /** Turn a pass that has just run its course into the record J.1.4 wants logged. */
-export function recordFor(pass: SatellitePass, completedAtMs: number): PassRecord {
+export function recordFor(
+  pass: SatellitePass,
+  completedAtMs: number,
+): PassRecord {
   const rng = noise(pass.id);
 
   const issues: string[] = [];
@@ -58,17 +61,26 @@ export function recordFor(pass: SatellitePass, completedAtMs: number): PassRecor
     issues.push("Carrier never locked — no data recovered");
   }
   if (pass.linkMarginDb < 4) {
-    issues.push(`Link margin ${pass.linkMarginDb} dB — below 4 dB planning floor`);
+    issues.push(
+      `Link margin ${pass.linkMarginDb} dB — below 4 dB planning floor`,
+    );
   }
 
-  const meanSignalPct = pass.linkLock === "UNLOCKED" ? 0 : pass.signalStrengthPct;
+  const meanSignalPct =
+    pass.linkLock === "UNLOCKED" ? 0 : pass.signalStrengthPct;
   const efficiencyPct =
     pass.plannedVolumeMb === 0
       ? 0
-      : Math.min(100, Math.round((pass.downlinkedMb / pass.plannedVolumeMb) * 100));
+      : Math.min(
+          100,
+          Math.round((pass.downlinkedMb / pass.plannedVolumeMb) * 100),
+        );
 
   return {
-    pass: { ...pass, status: pass.linkLock === "UNLOCKED" ? "MISSED" : "COMPLETED" },
+    pass: {
+      ...pass,
+      status: pass.linkLock === "UNLOCKED" ? "MISSED" : "COMPLETED",
+    },
     completedAt: completedAtMs,
     aosAt: completedAtMs - pass.durationSec * 1000,
     issues,
@@ -104,7 +116,12 @@ export const usePassHistoryStore = create<PassHistoryState>()(
           // idempotent rather than logging one pass twenty times a second.
           state.records.some((r) => r.pass.id === pass.id)
             ? state
-            : { records: [recordFor(pass, completedAtMs), ...state.records].slice(0, MAX_RECORDS) },
+            : {
+                records: [
+                  recordFor(pass, completedAtMs),
+                  ...state.records,
+                ].slice(0, MAX_RECORDS),
+              },
         ),
 
       clearHistory: () => set({ records: [] }),

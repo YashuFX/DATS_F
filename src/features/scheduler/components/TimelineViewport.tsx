@@ -39,7 +39,10 @@ export function TimelineViewport({
   /** Aperture pressure: share of the visible window that is booked. */
   const utilisation = useMemo(() => {
     const booked = passes.reduce((sum, p) => sum + p.durationSec, 0);
-    return Math.min(100, Math.round((booked / (windowSec * ANTENNAS.length)) * 100));
+    return Math.min(
+      100,
+      Math.round((booked / (windowSec * ANTENNAS.length)) * 100),
+    );
   }, [passes, windowSec]);
 
   const styleFor = (pass: SatellitePass) => ({
@@ -108,7 +111,11 @@ export function TimelineViewport({
           {[
             {
               label: "Zoom",
-              items: ZOOMS.map((m) => ({ key: m, text: `${m / 60}H`, on: m === zoomMin })),
+              items: ZOOMS.map((m) => ({
+                key: m,
+                text: `${m / 60}H`,
+                on: m === zoomMin,
+              })),
               set: (k: number) => setZoomMin(k),
             },
             {
@@ -183,7 +190,9 @@ export function TimelineViewport({
       <div className="relative min-h-0 flex-1 overflow-y-auto border-b-[max(1px,0.0625rem)] border-da-border">
         <span
           className="pointer-events-none absolute inset-y-0 z-10 w-[max(1px,0.0625rem)] bg-da-brand/25"
-          style={{ left: `calc(7.5rem + ${PLAYHEAD_PERCENT}% * (100% - 7.5rem) / 100%)` }}
+          style={{
+            left: `calc(7.5rem + ${PLAYHEAD_PERCENT}% * (100% - 7.5rem) / 100%)`,
+          }}
         />
 
         {ANTENNAS.map((antenna) => {
@@ -253,10 +262,18 @@ export function TimelineViewport({
                           ? "da-brand"
                           : "da-info";
 
+                  // How much of the task has run. A task that has crossed the
+                  // playhead is filling; one that has crossed it entirely is
+                  // full. This is what makes the lane readable at a glance —
+                  // the fill *is* the pass, not a hairline under it.
                   const elapsed = -pass.aosOffsetSec;
-                  const progress =
-                    pass.status === "TRACKING"
-                      ? Math.min(100, Math.max(0, (elapsed / pass.durationSec) * 100))
+                  const progress = done
+                    ? 100
+                    : pass.status === "TRACKING"
+                      ? Math.min(
+                          100,
+                          Math.max(0, (elapsed / pass.durationSec) * 100),
+                        )
                       : 0;
 
                   return (
@@ -267,7 +284,8 @@ export function TimelineViewport({
                       title={`${pass.satName} · ${pass.antennaId}`}
                       className={cn(
                         "absolute inset-y-[0.5rem] z-[5] cursor-pointer overflow-hidden rounded-[0.1875rem] border-[max(1px,0.0625rem)] px-[0.3125rem] text-left transition-colors",
-                        selected && "z-20 ring-[max(1px,0.0625rem)] ring-da-brand",
+                        selected &&
+                          "z-20 ring-[max(1px,0.0625rem)] ring-da-brand",
                       )}
                       style={{
                         left: `${left}%`,
@@ -279,8 +297,38 @@ export function TimelineViewport({
                         opacity: done ? 0.72 : 1,
                       }}
                     >
-                      {width > 6 && (
+                      {/*
+                        Progress sweep. The fill sits behind the label and runs
+                        the block's full height, so a task in progress reads as
+                        a bar filling rather than a box with a stripe. While it
+                        is live a bright leading edge marks the receive point;
+                        once complete the edge is gone and only the fill stays,
+                        which is what separates "running" from "ran".
+                      */}
+                      {progress > 0 && (
                         <>
+                          <span
+                            className="pointer-events-none absolute inset-y-0 left-0 z-0"
+                            style={{
+                              width: `${progress}%`,
+                              backgroundColor: `color-mix(in srgb, var(--color-${token}) ${done ? 26 : 34}%, transparent)`,
+                            }}
+                          />
+                          {!done && progress < 100 && (
+                            <span
+                              className="pointer-events-none absolute inset-y-0 z-[1] w-[max(2px,0.125rem)]"
+                              style={{
+                                left: `calc(${progress}% - max(1px, 0.0625rem))`,
+                                backgroundColor: `var(--color-${token})`,
+                                boxShadow: `0 0 0.375rem var(--color-${token})`,
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+
+                      {width > 6 && (
+                        <span className="relative z-[2] block">
                           <span
                             className="da-nums block truncate text-3xs font-bold leading-[0.875rem]"
                             style={{ color: `var(--color-${token})` }}
@@ -288,20 +336,10 @@ export function TimelineViewport({
                             {pass.satName}
                           </span>
                           <span className="da-nums block truncate text-[0.5rem] font-medium leading-[0.75rem] text-da-label">
-                            {pass.orbitClass} · {Math.round(pass.durationSec / 60)}m
+                            {pass.orbitClass} ·{" "}
+                            {Math.round(pass.durationSec / 60)}m
                           </span>
-                        </>
-                      )}
-
-                      {/* Live progress fill */}
-                      {progress > 0 && (
-                        <span
-                          className="absolute inset-x-0 bottom-0 h-[0.1875rem]"
-                          style={{
-                            width: `${progress}%`,
-                            backgroundColor: `var(--color-${token})`,
-                          }}
-                        />
+                        </span>
                       )}
                     </button>
                   );

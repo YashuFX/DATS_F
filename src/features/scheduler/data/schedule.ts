@@ -42,7 +42,7 @@ export const STATIONS: GroundStation[] = [
   { id: "PBR", name: "Port Blair (ISTRAC)", latDeg: 11.6234, lonDeg: 92.7265 },
   { id: "HSN", name: "Hassan (MCF)", latDeg: 13.0072, lonDeg: 76.0962 },
   { id: "LKN", name: "Lucknow (ISTRAC)", latDeg: 26.8467, lonDeg: 80.9462 },
-  { id: "BYL", name: "Byalalu (IDSN)", latDeg: 12.9500, lonDeg: 77.3700 },
+  { id: "BYL", name: "Byalalu (IDSN)", latDeg: 12.95, lonDeg: 77.37 },
 ];
 
 /**
@@ -60,7 +60,12 @@ export const ANTENNAS: Antenna[] = [
   { id: "BYL-ANT-01", stationId: "BYL" },
 ];
 
-const FAMILIES: { prefix: string; orbit: OrbitClass; band: [number, number]; priority: Priority }[] = [
+const FAMILIES: {
+  prefix: string;
+  orbit: OrbitClass;
+  band: [number, number];
+  priority: Priority;
+}[] = [
   { prefix: "RISAT", orbit: "SSO", band: [8025, 8400], priority: 1 },
   { prefix: "CARTOSAT", orbit: "SSO", band: [8025, 8400], priority: 1 },
   { prefix: "OCEANSAT", orbit: "SSO", band: [8100, 8300], priority: 2 },
@@ -143,7 +148,11 @@ export const PASSES: SatellitePass[] = (() => {
           ? "COMPLETED"
           : "SCHEDULED";
 
-    const linkLock: LinkLock = live ? (rng() > 0.85 ? "DEGRADED" : "LOCKED") : "UNLOCKED";
+    const linkLock: LinkLock = live
+      ? rng() > 0.85
+        ? "DEGRADED"
+        : "LOCKED"
+      : "UNLOCKED";
     const plannedVolumeMb = Math.round(durationSec * (0.6 + rng() * 1.9));
 
     out.push({
@@ -239,20 +248,28 @@ export const HISTORY: PassRecord[] = (() => {
     const sat = CATALOGUE[Math.floor(rng() * CATALOGUE.length)];
     const antenna = ANTENNAS[Math.floor(rng() * ANTENNAS.length)];
     const durationSec = 360 + Math.floor(rng() * 780);
-    const completedAt = epoch - i * (2400 + Math.floor(rng() * 5400) * 1000) / 1000 * 1000;
+    const completedAt =
+      epoch - ((i * (2400 + Math.floor(rng() * 5400) * 1000)) / 1000) * 1000;
     const aosAt = completedAt - durationSec * 1000;
 
     const degraded = rng() > 0.78;
     const missed = rng() > 0.94;
-    const meanSignalPct = missed ? 0 : Math.round(degraded ? 38 + rng() * 18 : 68 + rng() * 28);
+    const meanSignalPct = missed
+      ? 0
+      : Math.round(degraded ? 38 + rng() * 18 : 68 + rng() * 28);
     const plannedVolumeMb = Math.round(durationSec * (0.6 + rng() * 1.9));
     const downlinkedMb = missed
       ? 0
-      : Math.round(plannedVolumeMb * (degraded ? 0.55 + rng() * 0.3 : 0.94 + rng() * 0.06));
+      : Math.round(
+          plannedVolumeMb *
+            (degraded ? 0.55 + rng() * 0.3 : 0.94 + rng() * 0.06),
+        );
 
     const issues: string[] = [];
-    if (missed) issues.push("Pass missed — antenna held by higher-priority task");
-    else if (degraded) issues.push(ISSUE_POOL[Math.floor(rng() * ISSUE_POOL.length)]);
+    if (missed)
+      issues.push("Pass missed — antenna held by higher-priority task");
+    else if (degraded)
+      issues.push(ISSUE_POOL[Math.floor(rng() * ISSUE_POOL.length)]);
 
     return {
       pass: {
@@ -288,24 +305,47 @@ export const HISTORY: PassRecord[] = (() => {
       issues,
       meanSignalPct,
       dopplerDriftHz: Math.round((rng() - 0.5) * 9000),
-      efficiencyPct: plannedVolumeMb === 0 ? 0 : Math.round((downlinkedMb / plannedVolumeMb) * 100),
+      efficiencyPct:
+        plannedVolumeMb === 0
+          ? 0
+          : Math.round((downlinkedMb / plannedVolumeMb) * 100),
     };
   });
 })();
 
-export const HISTORY_STATS = {
-  completed: HISTORY.filter((r) => r.pass.status === "COMPLETED").length,
-  missed: HISTORY.filter((r) => r.pass.status === "MISSED").length,
-  lockSuccessPct: Math.round(
-    (HISTORY.filter((r) => r.pass.linkLock === "LOCKED").length / HISTORY.length) * 100,
-  ),
-  meanSignalPct: Math.round(
-    HISTORY.reduce((s, r) => s + r.meanSignalPct, 0) / HISTORY.length,
-  ),
-  volumeGb: Number(
-    (HISTORY.reduce((s, r) => s + r.pass.downlinkedMb, 0) / 1024).toFixed(1),
-  ),
-};
+/**
+ * Aggregates for the history KPI strip.
+ *
+ * A function of the records rather than a constant, because the archive is now
+ * live: passes land in it as they finish and the operator can empty it, and the
+ * headline figures have to follow. An empty archive reports zeroes rather than
+ * dividing by nothing.
+ */
+export function statsFor(records: PassRecord[]) {
+  const n = records.length;
+  if (n === 0) {
+    return {
+      completed: 0,
+      missed: 0,
+      lockSuccessPct: 0,
+      meanSignalPct: 0,
+      volumeGb: 0,
+    };
+  }
+  return {
+    completed: records.filter((r) => r.pass.status === "COMPLETED").length,
+    missed: records.filter((r) => r.pass.status === "MISSED").length,
+    lockSuccessPct: Math.round(
+      (records.filter((r) => r.pass.linkLock === "LOCKED").length / n) * 100,
+    ),
+    meanSignalPct: Math.round(
+      records.reduce((s, r) => s + r.meanSignalPct, 0) / n,
+    ),
+    volumeGb: Number(
+      (records.reduce((s, r) => s + r.pass.downlinkedMb, 0) / 1024).toFixed(1),
+    ),
+  };
+}
 
 export const PRIORITY_LABEL: Record<Priority, string> = {
   1: "Critical",

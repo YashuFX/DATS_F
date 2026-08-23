@@ -34,7 +34,9 @@ export function StationMatrixViewport({
           const antennas = ANTENNAS.filter((a) => a.stationId === station.id);
           const booked = passes.filter((p) => p.stationId === station.id);
           const seconds = booked.reduce((s, p) => s + p.durationSec, 0);
-          const conflicts = booked.filter((p) => p.status === "CONFLICT").length;
+          const conflicts = booked.filter(
+            (p) => p.status === "CONFLICT",
+          ).length;
 
           return (
             <section
@@ -43,7 +45,9 @@ export function StationMatrixViewport({
             >
               <div className="flex shrink-0 items-start justify-between gap-[0.5rem]">
                 <span className="flex min-w-0 flex-col leading-none">
-                  <span className="da-nums text-md font-bold text-da-text">{station.id}</span>
+                  <span className="da-nums text-md font-bold text-da-text">
+                    {station.id}
+                  </span>
                   <span className="mt-[0.25rem] truncate text-3xs font-medium uppercase tracking-[0.06em] text-da-label">
                     {station.name}
                   </span>
@@ -95,7 +99,9 @@ export function StationMatrixViewport({
                       </span>
                       <span
                         className="shrink-0 text-3xs font-bold uppercase"
-                        style={{ color: `var(--color-${STATUS_TOKEN[pass.status]})` }}
+                        style={{
+                          color: `var(--color-${STATUS_TOKEN[pass.status]})`,
+                        }}
                       >
                         {pass.status}
                       </span>

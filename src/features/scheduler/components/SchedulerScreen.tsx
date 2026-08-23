@@ -1,11 +1,13 @@
 "use client";
 
 import { Grid3x3, ListFilter, Pause, Play, Plus, Rows3 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { CONFLICTS, PASSES, SCHEDULE_STATS } from "../data/schedule";
+import { useArchiveRehydration } from "../hooks/usePassArchive";
 import { useSimClock } from "../hooks/useSimClock";
-import type { SatellitePass } from "../types";
+import { usePassHistoryStore } from "../store/passHistoryStore";
+import type { LogEntry, SatellitePass } from "../types";
 import { BottomDeck } from "./BottomDeck";
 import { ConstellationExplorer } from "./ConstellationExplorer";
 import { StationMatrixViewport } from "./StationMatrixViewport";
@@ -15,15 +17,52 @@ import { TimelineViewport } from "./TimelineViewport";
 type Viewport = "timeline" | "matrix";
 type StatusFilter = "ALL" | SatellitePass["status"];
 
-const FILTERS: StatusFilter[] = ["ALL", "TRACKING", "SCHEDULED", "CONFLICT", "COMPLETED"];
+const FILTERS: StatusFilter[] = [
+  "ALL",
+  "TRACKING",
+  "SCHEDULED",
+  "CONFLICT",
+  "COMPLETED",
+];
 
-const INITIAL_LOGS = [
-  "09:00:04  SGP4 propagation complete — 70 satellites, 1 ms resolution",
-  "09:00:06  Window booked: 34 tasks across 8 antennas",
-  "09:00:07  CONTENTION detected — BLR-ANT-02, 12m 54s overlap",
-  "09:00:07  CONTENTION detected — HSN-ANT-01, 3m 59s overlap",
-  "09:00:11  Transmitter ONLINE — duty cycle within 10.0% limit",
-  "09:00:14  LOCKED — INSAT-02 acquired on PBR-ANT-01",
+/** Mission epoch. Fixed, so server and client render the same clock. */
+const MISSION_EPOCH_MS = Date.parse("2026-08-23T09:00:00Z");
+
+/** Mission-clock HH:MM:SS at a given number of elapsed simulated seconds. */
+const clockAt = (elapsedSec: number) =>
+  new Date(MISSION_EPOCH_MS + elapsedSec * 1000).toISOString().slice(11, 19);
+
+const BOOT_LOG: LogEntry[] = [
+  {
+    time: "09:00:04",
+    level: "SYS",
+    message: "SGP4 propagation complete — 70 satellites at 1 ms resolution",
+  },
+  {
+    time: "09:00:06",
+    level: "PLAN",
+    message: "Window booked — 34 tasks across 8 antennas",
+  },
+  {
+    time: "09:00:07",
+    level: "FAULT",
+    message: "Contention on BLR-ANT-02 — 12m 54s overlap",
+  },
+  {
+    time: "09:00:07",
+    level: "FAULT",
+    message: "Contention on HSN-ANT-01 — 3m 59s overlap",
+  },
+  {
+    time: "09:00:11",
+    level: "SYS",
+    message: "Transmitter ONLINE — duty cycle within 10.0% limit",
+  },
+  {
+    time: "09:00:14",
+    level: "ACQ",
+    message: "Carrier locked — INSAT-02 acquired on PBR-ANT-01",
+  },
 ];
 
 /**
@@ -51,7 +90,7 @@ export function SchedulerScreen() {
   // opens at 20x, where a pass plays out in well under a minute, and 1x stays
   // available for reading the true rate.
   const [speed, setSpeed] = useState(20);
-  const [logs, setLogs] = useState(INITIAL_LOGS);
+  const [operatorLog, setOperatorLog] = useState<LogEntry[]>([]);
 
   const elapsedSec = useSimClock({ paused, speed });
 
@@ -79,23 +118,84 @@ export function SchedulerScreen() {
   );
 
   const visible = useMemo(
-    () => (filter === "ALL" ? livePasses : livePasses.filter((p) => p.status === filter)),
+    () =>
+      filter === "ALL"
+        ? livePasses
+        : livePasses.filter((p) => p.status === filter),
     [filter, livePasses],
   );
 
   const activePass = livePasses.find((p) => p.id === selectedId) ?? null;
 
+  /**
+   * Hand finished passes to the archive.
+   *
+   * This is the one direction data flows between the two screens: a task that
+   * runs past its LOS stops being the scheduler's concern and becomes a history
+   * record. `seenRef` is seeded on the first tick with whatever was already
+   * finished when the console opened, so only passes that complete *while you
+   * are watching* are logged, and the store's own id check makes the call
+   * idempotent across the twenty ticks a second that observe the same event.
+   */
+  const archivePass = usePassHistoryStore((s) => s.archivePass);
+  useArchiveRehydration();
+  const seenRef = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    const finished = livePasses.filter((p) => p.status === "COMPLETED");
+
+    if (seenRef.current === null) {
+      seenRef.current = new Set(finished.map((p) => p.id));
+      return;
+    }
+
+    for (const pass of finished) {
+      if (seenRef.current.has(pass.id)) continue;
+      seenRef.current.add(pass.id);
+      archivePass(pass, MISSION_EPOCH_MS + elapsedSec * 1000);
+    }
+  }, [livePasses, elapsedSec, archivePass]);
+
+  /**
+   * The command uplink, newest first.
+   *
+   * Completions are derived from the clock rather than pushed into state as
+   * they happen: a pass whose LOS has gone by is, by definition, a line in the
+   * log, and computing it means the log cannot drift out of step with the
+   * timeline it describes. Only operator actions — which are events, not
+   * functions of time — are held in state.
+   */
+  const logs = useMemo<LogEntry[]>(() => {
+    const completions = livePasses
+      .filter((p) => p.status === "COMPLETED")
+      .map<LogEntry>((pass) => ({
+        // Completion happened `durationSec` after this pass's AOS, which is
+        // itself `elapsedSec + aosOffsetSec` into the mission.
+        time: clockAt(elapsedSec + pass.aosOffsetSec + pass.durationSec),
+        level: pass.linkLock === "UNLOCKED" ? "WARN" : "ACQ",
+        message:
+          pass.linkLock === "UNLOCKED"
+            ? `LOS — ${pass.satName} ended unlocked on ${pass.antennaId}, no data recovered`
+            : `LOS — ${pass.satName} complete on ${pass.antennaId}, ${pass.downlinkedMb} MB archived`,
+      }));
+
+    // HH:MM:SS sorts lexicographically in clock order within the day.
+    return [...completions, ...operatorLog, ...BOOT_LOG].sort((a, b) =>
+      b.time.localeCompare(a.time),
+    );
+  }, [livePasses, elapsedSec, operatorLog]);
+
   /** Mission clock, so the speed control has something visibly counting. */
-  const missionClock = new Date(
-    Date.parse("2026-08-23T09:00:00Z") + elapsedSec * 1000,
-  )
-    .toISOString()
-    .slice(11, 19);
+  const missionClock = clockAt(elapsedSec);
 
   const autoResolve = () =>
-    setLogs((prev) => [
+    setOperatorLog((prev) => [
+      {
+        time: clockAt(elapsedSec),
+        level: "PLAN",
+        message: `Auto-resolve — ${CONFLICTS.length} contention(s) re-planned onto the next free antenna`,
+      },
       ...prev,
-      `09:0${prev.length % 10}:22  AUTO-RESOLVE — ${CONFLICTS.length} contention(s) re-planned onto next free antenna`,
     ]);
 
   return (
@@ -104,7 +204,10 @@ export function SchedulerScreen() {
       <div className="flex h-[2.75rem] shrink-0 items-center justify-between gap-[0.875rem] border-b-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem]">
         <div className="flex items-center gap-[0.875rem]">
           <span className="flex items-center gap-[0.3125rem]">
-            <ListFilter className="size-[0.8125rem] text-da-muted" strokeWidth={2.2} />
+            <ListFilter
+              className="size-[0.8125rem] text-da-muted"
+              strokeWidth={2.2}
+            />
             <span className="flex items-center gap-[0.125rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border bg-da-field p-[0.1875rem]">
               {FILTERS.map((f) => (
                 <button
@@ -255,7 +358,11 @@ export function SchedulerScreen() {
         />
       </div>
 
-      <BottomDeck activePass={activePass} logs={logs} onAutoResolve={autoResolve} />
+      <BottomDeck
+        activePass={activePass}
+        logs={logs}
+        onAutoResolve={autoResolve}
+      />
     </div>
   );
 }

@@ -3,7 +3,12 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
-import { CONFLICTS, PRIORITY_LABEL, PRIORITY_TOKEN, STATIONS } from "../data/schedule";
+import {
+  CONFLICTS,
+  PRIORITY_LABEL,
+  PRIORITY_TOKEN,
+  STATIONS,
+} from "../data/schedule";
 import type { SatellitePass } from "../types";
 
 /**
@@ -22,7 +27,9 @@ export function ConstellationExplorer({
   selectedPassId: string;
   onSelectPass: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(["SSO", "GEO"]));
+  const [expanded, setExpanded] = useState<Set<string>>(
+    new Set(["SSO", "GEO"]),
+  );
 
   const grouped = useMemo(() => {
     const out: Record<string, SatellitePass[]> = {};
@@ -70,7 +77,9 @@ export function ConstellationExplorer({
               key={label}
               className="flex flex-col items-center gap-[0.125rem] py-[0.375rem] text-center"
             >
-              <span className="da-nums text-2xs font-bold text-da-text">{count}</span>
+              <span className="da-nums text-2xs font-bold text-da-text">
+                {count}
+              </span>
               <span className="text-3xs font-medium uppercase tracking-[0.06em] text-da-label">
                 {label}
               </span>
@@ -91,15 +100,23 @@ export function ConstellationExplorer({
               >
                 <span className="flex items-center gap-[0.25rem]">
                   {open ? (
-                    <ChevronDown className="size-[0.6875rem] text-da-muted" strokeWidth={2.4} />
+                    <ChevronDown
+                      className="size-[0.6875rem] text-da-muted"
+                      strokeWidth={2.4}
+                    />
                   ) : (
-                    <ChevronRight className="size-[0.6875rem] text-da-muted" strokeWidth={2.4} />
+                    <ChevronRight
+                      className="size-[0.6875rem] text-da-muted"
+                      strokeWidth={2.4}
+                    />
                   )}
                   <span className="text-3xs font-bold uppercase tracking-[0.1em] text-da-text">
                     {cat}
                   </span>
                 </span>
-                <span className="da-nums text-3xs font-bold text-da-label">{group.length}</span>
+                <span className="da-nums text-3xs font-bold text-da-label">
+                  {group.length}
+                </span>
               </button>
 
               {open &&
@@ -128,7 +145,9 @@ export function ConstellationExplorer({
                         </span>
                         <span
                           className="shrink-0 text-3xs font-bold uppercase"
-                          style={{ color: `var(--color-${PRIORITY_TOKEN[pass.priority]})` }}
+                          style={{
+                            color: `var(--color-${PRIORITY_TOKEN[pass.priority]})`,
+                          }}
                         >
                           {PRIORITY_LABEL[pass.priority]}
                         </span>
@@ -151,7 +170,9 @@ export function ConstellationExplorer({
                           </span>
                           <span className="flex justify-between text-[0.5rem] text-da-label">
                             <span>Downlink</span>
-                            <span className="da-nums">{pass.frequencyMHz} MHz</span>
+                            <span className="da-nums">
+                              {pass.frequencyMHz} MHz
+                            </span>
                           </span>
                           {isContended && (
                             <span className="text-[0.5rem] font-bold uppercase tracking-[0.06em] text-da-danger">

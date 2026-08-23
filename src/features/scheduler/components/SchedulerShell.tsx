@@ -69,7 +69,8 @@ export function SchedulerShell({ children }: { children: ReactNode }) {
           >
             <Radio className="size-[0.8125rem]" strokeWidth={2.2} />
             <span className="da-nums text-3xs font-bold uppercase tracking-[0.08em]">
-              {CONFLICTS.length} {CONFLICTS.length === 1 ? "conflict" : "conflicts"}
+              {CONFLICTS.length}{" "}
+              {CONFLICTS.length === 1 ? "conflict" : "conflicts"}
             </span>
           </span>
 

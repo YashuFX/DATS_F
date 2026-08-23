@@ -11,12 +11,7 @@ export type OrbitClass = "LEO" | "MEO" | "GEO" | "HEO" | "SSO";
 export type Priority = 1 | 2 | 3;
 
 export type PassStatus =
-  | "TRACKING"
-  | "SCHEDULED"
-  | "CONFLICT"
-  | "COMPLETED"
-  | "MISSED"
-  | "CANCELLED";
+  "TRACKING" | "SCHEDULED" | "CONFLICT" | "COMPLETED" | "MISSED" | "CANCELLED";
 
 export type LinkLock = "LOCKED" | "ACQUIRING" | "DEGRADED" | "UNLOCKED";
 
@@ -94,4 +89,17 @@ export interface Conflict {
   /** The two passes contending for the antenna. */
   passIds: [string, string];
   overlapSec: number;
+}
+
+/** One line of the command uplink log. */
+export interface LogEntry {
+  /** Mission-clock time of the event, HH:MM:SS. */
+  time: string;
+  /**
+   * What kind of event it was. The uplink is scanned, not read, so the level is
+   * carried as data and rendered as a fixed-width tag rather than inferred from
+   * substrings of the message.
+   */
+  level: "SYS" | "PLAN" | "ACQ" | "WARN" | "FAULT";
+  message: string;
 }

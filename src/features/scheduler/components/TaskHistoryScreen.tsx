@@ -4,8 +4,11 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Database,
   Download,
+  RotateCcw,
   Search,
   Signal,
   TriangleAlert,
@@ -13,24 +16,38 @@ import {
 import { useMemo, useState } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import {
-  HISTORY,
-  HISTORY_STATS,
   PRIORITY_LABEL,
   PRIORITY_TOKEN,
   STATIONS,
+  statsFor,
 } from "../data/schedule";
+import { useArchiveRehydration } from "../hooks/usePassArchive";
+import { usePassHistoryStore } from "../store/passHistoryStore";
 import type { PassRecord, Priority } from "../types";
 
-type SortKey = "completedAt" | "satName" | "durationSec" | "efficiencyPct" | "priority";
+/**
+ * Rows per page.
+ *
+ * Fixed rather than measured, and that is sound here: every length on this
+ * screen is in rem off one root font-size clamp, so the table occupies the same
+ * fraction of the viewport at 1440 as at 4K and the same fourteen rows fit
+ * either way.
+ */
+const PAGE_SIZE = 14;
+
+type SortKey =
+  "completedAt" | "satName" | "durationSec" | "efficiencyPct" | "priority";
 
 function Panel({
   title,
   action,
+  footer,
   className,
   children,
 }: {
   title: string;
   action?: React.ReactNode;
+  footer?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -43,17 +60,123 @@ function Panel({
         {action}
       </header>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      {footer && (
+        <div className="flex h-[2.125rem] shrink-0 items-center justify-between gap-[0.5rem] border-t-[max(1px,0.0625rem)] border-da-border px-[0.75rem]">
+          {footer}
+        </div>
+      )}
     </section>
   );
 }
 
-function Row({ label, value, tone }: { label: string; value: string; tone?: string }) {
+/** One step arrow in the pager. Hoisted so it is not re-created each render. */
+function PagerStep({
+  to,
+  disabled,
+  onChange,
+  children,
+}: {
+  to: number;
+  disabled: boolean;
+  onChange: (page: number) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(to)}
+      className="flex size-[1.375rem] items-center justify-center rounded-[0.1875rem] border-[max(1px,0.0625rem)] border-da-border text-da-muted transition-colors enabled:cursor-pointer enabled:hover:border-da-brand enabled:hover:text-da-brand disabled:opacity-35"
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Page switcher.
+ *
+ * Windowed to five numbers around the current page so a 500-record archive does
+ * not grow a row of forty buttons, with the first and last always reachable.
+ */
+function Pager({
+  page,
+  pageCount,
+  onChange,
+}: {
+  page: number;
+  pageCount: number;
+  onChange: (page: number) => void;
+}) {
+  const pages: number[] = [];
+  const start = Math.max(0, Math.min(page - 2, pageCount - 5));
+  for (let i = start; i < Math.min(pageCount, start + 5); i += 1) pages.push(i);
+
+  return (
+    <span className="flex items-center gap-[0.25rem]">
+      <PagerStep to={page - 1} disabled={page === 0} onChange={onChange}>
+        <ChevronLeft className="size-[0.75rem]" strokeWidth={2.6} />
+      </PagerStep>
+
+      {pages[0]! > 0 && (
+        <span className="da-nums px-[0.125rem] text-3xs font-bold text-da-label">
+          …
+        </span>
+      )}
+
+      {pages.map((i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onChange(i)}
+          className={cn(
+            "da-nums h-[1.375rem] min-w-[1.375rem] cursor-pointer rounded-[0.1875rem] border-[max(1px,0.0625rem)] px-[0.3125rem] text-3xs font-bold transition-colors",
+            i === page
+              ? "border-da-brand bg-da-brand text-da-on-brand"
+              : "border-da-border text-da-muted hover:border-da-brand hover:text-da-brand",
+          )}
+        >
+          {i + 1}
+        </button>
+      ))}
+
+      {pages[pages.length - 1]! < pageCount - 1 && (
+        <span className="da-nums px-[0.125rem] text-3xs font-bold text-da-label">
+          …
+        </span>
+      )}
+
+      <PagerStep
+        to={page + 1}
+        disabled={page >= pageCount - 1}
+        onChange={onChange}
+      >
+        <ChevronRight className="size-[0.75rem]" strokeWidth={2.6} />
+      </PagerStep>
+    </span>
+  );
+}
+
+function Row({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
   return (
     <div className="flex items-center justify-between gap-[0.5rem] py-[0.3125rem]">
       <span className="truncate text-2xs font-medium uppercase tracking-[0.06em] text-da-muted">
         {label}
       </span>
-      <span className={cn("da-nums shrink-0 text-2xs font-bold", tone ?? "text-da-text")}>
+      <span
+        className={cn(
+          "da-nums shrink-0 text-2xs font-bold",
+          tone ?? "text-da-text",
+        )}
+      >
         {value}
       </span>
     </div>
@@ -89,12 +212,21 @@ function Kpi({
           {label}
         </span>
         <span className="mt-[0.3125rem] flex items-baseline gap-[0.1875rem]">
-          <span className={cn("da-nums text-xl font-bold tracking-[-0.02em]", tone ?? "text-da-text")}>
+          <span
+            className={cn(
+              "da-nums text-xl font-bold tracking-[-0.02em]",
+              tone ?? "text-da-text",
+            )}
+          >
             {value}
           </span>
-          {unit && <span className="text-2xs font-semibold text-da-muted">{unit}</span>}
+          {unit && (
+            <span className="text-2xs font-semibold text-da-muted">{unit}</span>
+          )}
         </span>
-        <span className="mt-[0.3125rem] truncate text-3xs font-medium text-da-muted">{sub}</span>
+        <span className="mt-[0.3125rem] truncate text-3xs font-medium text-da-muted">
+          {sub}
+        </span>
       </span>
       <span className="flex size-[2rem] shrink-0 items-center justify-center rounded-[0.375rem] bg-da-subtle text-da-muted">
         {icon}
@@ -103,7 +235,8 @@ function Kpi({
   );
 }
 
-const utc = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
+const utc = (ms: number) =>
+  new Date(ms).toISOString().replace("T", " ").slice(0, 19);
 const utcDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const fmtDuration = (sec: number) =>
   `${Math.floor(sec / 60)}m ${String(Math.round(sec % 60)).padStart(2, "0")}s`;
@@ -127,23 +260,42 @@ export function TaskHistoryScreen() {
     key: "completedAt",
     dir: "desc",
   });
-  const [selectedId, setSelectedId] = useState(HISTORY[0]?.pass.id ?? "");
+  const [selectedId, setSelectedId] = useState("");
+  const [page, setPage] = useState(0);
+
+  /**
+   * The archive itself, live.
+   *
+   * Everything on this screen is a view of this array: a pass that finishes on
+   * the scheduler is pushed here by the store and appears in the table on the
+   * next render, and Refresh empties it. There is no separate "seeded" data any
+   * more — the shipped log is simply the store's initial value.
+   */
+  const records = usePassHistoryStore((s) => s.records);
+  const clearHistory = usePassHistoryStore((s) => s.clearHistory);
+  useArchiveRehydration();
+
+  const stats = useMemo(() => statsFor(records), [records]);
 
   const days = useMemo(
-    () => Array.from(new Set(HISTORY.map((r) => utcDate(r.completedAt)))).sort().reverse(),
-    [],
+    () =>
+      Array.from(new Set(records.map((r) => utcDate(r.completedAt))))
+        .sort()
+        .reverse(),
+    [records],
   );
 
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
-    const filtered = HISTORY.filter((r) => {
+    const filtered = records.filter((r) => {
       const matchesText =
         term === "" ||
         r.pass.satName.toLowerCase().includes(term) ||
         r.pass.id.toLowerCase().includes(term) ||
         r.pass.antennaId.toLowerCase().includes(term) ||
         String(r.pass.noradId).includes(term);
-      const matchesPriority = priority === "ALL" || r.pass.priority === priority;
+      const matchesPriority =
+        priority === "ALL" || r.pass.priority === priority;
       const matchesOutcome =
         outcome === "ALL" ||
         (outcome === "CLEAN" ? r.issues.length === 0 : r.issues.length > 0);
@@ -166,29 +318,70 @@ export function TaskHistoryScreen() {
           return (a.completedAt - b.completedAt) * dir;
       }
     });
-  }, [query, priority, outcome, day, sort]);
+  }, [records, query, priority, outcome, day, sort]);
+
+  /**
+   * Narrowing the filters can strand you on a page that no longer exists, so
+   * the view resets to the first page whenever they change. Done during render
+   * rather than in an effect — React's documented way to reset state on a
+   * changing input, and it avoids painting one frame of the wrong page.
+   */
+  const filterKey = `${query}|${priority}|${outcome}|${day}|${sort.key}|${sort.dir}`;
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (lastFilterKey !== filterKey) {
+    setLastFilterKey(filterKey);
+    setPage(0);
+  }
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  // Clamp rather than trust: clearing the archive drops the page count to one
+  // while `page` may still be sitting at six.
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = rows.slice(
+    safePage * PAGE_SIZE,
+    safePage * PAGE_SIZE + PAGE_SIZE,
+  );
 
   const selected: PassRecord | undefined =
-    rows.find((r) => r.pass.id === selectedId) ?? rows[0];
+    rows.find((r) => r.pass.id === selectedId) ?? pageRows[0];
   const station = STATIONS.find((s) => s.id === selected?.pass.stationId);
 
   const toggleSort = (key: SortKey) =>
     setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "desc" },
     );
 
-  const COLUMNS: { key: string; label: string; sort?: SortKey; width: string; align?: "right" }[] = [
+  const COLUMNS: {
+    key: string;
+    label: string;
+    sort?: SortKey;
+    width: string;
+    align?: "right";
+  }[] = [
     { key: "id", label: "Acq ID", width: "5.5rem" },
     { key: "sat", label: "Satellite", sort: "satName", width: "8.5rem" },
     { key: "antenna", label: "Antenna", width: "6rem" },
     // AOS carries time only — the date is already on the Completed column.
     { key: "aos", label: "AOS", width: "4.75rem" },
-    { key: "completed", label: "Completed (UTC)", sort: "completedAt", width: "9.25rem" },
+    {
+      key: "completed",
+      label: "Completed (UTC)",
+      sort: "completedAt",
+      width: "9.25rem",
+    },
     { key: "duration", label: "Duration", sort: "durationSec", width: "5rem" },
     { key: "el", label: "Max El", width: "4.25rem", align: "right" },
     { key: "lock", label: "Link Lock", width: "5.25rem" },
     { key: "downlink", label: "Downlinked", width: "5.5rem", align: "right" },
-    { key: "eff", label: "Efficiency", sort: "efficiencyPct", width: "5rem", align: "right" },
+    {
+      key: "eff",
+      label: "Efficiency",
+      sort: "efficiencyPct",
+      width: "5rem",
+      align: "right",
+    },
     { key: "priority", label: "Priority", sort: "priority", width: "5rem" },
     { key: "issues", label: "Issues", width: "10rem" },
   ];
@@ -237,7 +430,10 @@ export function TaskHistoryScreen() {
               {
                 value: day,
                 onChange: setDay,
-                options: [["ALL", "All dates"], ...days.map((d) => [d, d] as [string, string])],
+                options: [
+                  ["ALL", "All dates"],
+                  ...days.map((d) => [d, d] as [string, string]),
+                ],
               },
             ].map((f, i) => (
               <select
@@ -260,23 +456,27 @@ export function TaskHistoryScreen() {
         <div className="da-card flex min-h-0 items-center">
           <Kpi
             label="Completed Passes"
-            value={`${HISTORY_STATS.completed}`}
-            sub={`${HISTORY_STATS.missed} missed`}
+            value={`${stats.completed}`}
+            sub={`${stats.missed} missed`}
             icon={<CheckCircle2 className="size-[1rem]" strokeWidth={2} />}
             divider
           />
           <Kpi
             label="Link Lock Success"
-            value={`${HISTORY_STATS.lockSuccessPct}`}
+            value={`${stats.lockSuccessPct}`}
             unit="%"
             sub="Locked at first acquisition"
-            tone={HISTORY_STATS.lockSuccessPct >= 80 ? "text-da-success" : "text-da-warn-text"}
+            tone={
+              stats.lockSuccessPct >= 80
+                ? "text-da-success"
+                : "text-da-warn-text"
+            }
             icon={<Signal className="size-[1rem]" strokeWidth={2} />}
             divider
           />
           <Kpi
             label="Mean Signal"
-            value={`${HISTORY_STATS.meanSignalPct}`}
+            value={`${stats.meanSignalPct}`}
             unit="%"
             sub="Across archived passes"
             icon={<Signal className="size-[1rem]" strokeWidth={2} />}
@@ -284,7 +484,7 @@ export function TaskHistoryScreen() {
           />
           <Kpi
             label="Data Archived"
-            value={`${HISTORY_STATS.volumeGb}`}
+            value={`${stats.volumeGb}`}
             unit="GB"
             sub="Downlinked and stored"
             icon={<Database className="size-[1rem]" strokeWidth={2} />}
@@ -298,8 +498,21 @@ export function TaskHistoryScreen() {
           action={
             <span className="flex shrink-0 items-center gap-[0.625rem]">
               <span className="da-nums text-3xs font-medium text-da-label">
-                {rows.length} of {HISTORY.length} records
+                {rows.length} of {records.length} records
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearHistory();
+                  setPage(0);
+                  setSelectedId("");
+                }}
+                title="Clear the archive. It refills as scheduled tasks complete."
+                className="inline-flex h-[1.5rem] cursor-pointer items-center gap-[0.3125rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border px-[0.5rem] text-3xs font-bold uppercase tracking-[0.06em] text-da-muted transition-colors hover:border-da-danger hover:text-da-danger"
+              >
+                <RotateCcw className="size-[0.625rem]" strokeWidth={2.4} />
+                Refresh
+              </button>
               <button
                 type="button"
                 className="inline-flex h-[1.5rem] cursor-pointer items-center gap-[0.3125rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-brand/35 bg-da-brand-soft px-[0.5rem] text-3xs font-bold uppercase tracking-[0.06em] text-da-brand transition-colors hover:bg-da-brand hover:text-da-on-brand"
@@ -308,6 +521,16 @@ export function TaskHistoryScreen() {
                 Export
               </button>
             </span>
+          }
+          footer={
+            <>
+              <Pager page={safePage} pageCount={pageCount} onChange={setPage} />
+              <span className="da-nums text-3xs font-medium text-da-label">
+                {rows.length === 0
+                  ? "No records"
+                  : `Showing ${safePage * PAGE_SIZE + 1}–${safePage * PAGE_SIZE + pageRows.length}`}
+              </span>
+            </>
           }
         >
           <table className="w-full table-fixed border-collapse">
@@ -339,9 +562,15 @@ export function TaskHistoryScreen() {
                         {c.label}
                         {sort.key === c.sort &&
                           (sort.dir === "asc" ? (
-                            <ArrowUp className="size-[0.625rem]" strokeWidth={2.6} />
+                            <ArrowUp
+                              className="size-[0.625rem]"
+                              strokeWidth={2.6}
+                            />
                           ) : (
-                            <ArrowDown className="size-[0.625rem]" strokeWidth={2.6} />
+                            <ArrowDown
+                              className="size-[0.625rem]"
+                              strokeWidth={2.6}
+                            />
                           ))}
                       </button>
                     ) : (
@@ -352,7 +581,7 @@ export function TaskHistoryScreen() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {pageRows.map((r) => {
                 const isSelected = r.pass.id === selected?.pass.id;
                 const missed = r.pass.status === "MISSED";
                 return (
@@ -421,7 +650,9 @@ export function TaskHistoryScreen() {
                     <td className="px-[0.625rem]">
                       <span
                         className="text-2xs font-bold"
-                        style={{ color: `var(--color-${PRIORITY_TOKEN[r.pass.priority]})` }}
+                        style={{
+                          color: `var(--color-${PRIORITY_TOKEN[r.pass.priority]})`,
+                        }}
                       >
                         {PRIORITY_LABEL[r.pass.priority]}
                       </span>
@@ -429,7 +660,10 @@ export function TaskHistoryScreen() {
                     <td className="max-w-0 px-[0.625rem]">
                       {r.issues.length === 0 ? (
                         <span className="flex items-center gap-[0.25rem] text-2xs font-medium text-da-success">
-                          <CheckCircle2 className="size-[0.75rem] shrink-0" strokeWidth={2.2} />
+                          <CheckCircle2
+                            className="size-[0.75rem] shrink-0"
+                            strokeWidth={2.2}
+                          />
                           Clean
                         </span>
                       ) : (
@@ -440,7 +674,10 @@ export function TaskHistoryScreen() {
                           )}
                           title={r.issues.join(" · ")}
                         >
-                          <TriangleAlert className="size-[0.75rem] shrink-0" strokeWidth={2.2} />
+                          <TriangleAlert
+                            className="size-[0.75rem] shrink-0"
+                            strokeWidth={2.2}
+                          />
                           <span className="truncate">{r.issues[0]}</span>
                         </span>
                       )}
@@ -465,10 +702,14 @@ export function TaskHistoryScreen() {
                   className="shrink-0 rounded-[0.1875rem] px-[0.375rem] py-[0.0625rem] text-3xs font-bold uppercase tracking-[0.06em]"
                   style={{
                     backgroundColor: `color-mix(in srgb, var(--color-${
-                      selected.pass.status === "MISSED" ? "da-danger" : "da-success"
+                      selected.pass.status === "MISSED"
+                        ? "da-danger"
+                        : "da-success"
                     }) 14%, transparent)`,
                     color: `var(--color-${
-                      selected.pass.status === "MISSED" ? "da-danger" : "da-success"
+                      selected.pass.status === "MISSED"
+                        ? "da-danger"
+                        : "da-success"
                     })`,
                   }}
                 >
@@ -489,10 +730,22 @@ export function TaskHistoryScreen() {
                 <div className="divide-y-[max(1px,0.0625rem)] divide-da-border/70">
                   <Row label="AOS" value={utc(selected.aosAt)} />
                   <Row label="Completed" value={utc(selected.completedAt)} />
-                  <Row label="Duration" value={fmtDuration(selected.pass.durationSec)} />
-                  <Row label="Max elevation" value={`${selected.pass.maxElevationDeg}°`} />
-                  <Row label="Mean signal" value={`${selected.meanSignalPct}%`} />
-                  <Row label="Doppler drift" value={`${selected.dopplerDriftHz} Hz`} />
+                  <Row
+                    label="Duration"
+                    value={fmtDuration(selected.pass.durationSec)}
+                  />
+                  <Row
+                    label="Max elevation"
+                    value={`${selected.pass.maxElevationDeg}°`}
+                  />
+                  <Row
+                    label="Mean signal"
+                    value={`${selected.meanSignalPct}%`}
+                  />
+                  <Row
+                    label="Doppler drift"
+                    value={`${selected.dopplerDriftHz} Hz`}
+                  />
                   <Row
                     label="Downlinked"
                     value={`${selected.pass.downlinkedMb} / ${selected.pass.plannedVolumeMb} MB`}
@@ -500,10 +753,17 @@ export function TaskHistoryScreen() {
                   <Row
                     label="Efficiency"
                     value={`${selected.efficiencyPct}%`}
-                    tone={selected.efficiencyPct >= 90 ? "text-da-success" : "text-da-warn-text"}
+                    tone={
+                      selected.efficiencyPct >= 90
+                        ? "text-da-success"
+                        : "text-da-warn-text"
+                    }
                   />
                   <Row label="Modulation" value={selected.pass.modulation} />
-                  <Row label="Downlink" value={`${selected.pass.frequencyMHz} MHz`} />
+                  <Row
+                    label="Downlink"
+                    value={`${selected.pass.frequencyMHz} MHz`}
+                  />
                 </div>
               </div>
             </Panel>
@@ -512,9 +772,13 @@ export function TaskHistoryScreen() {
               <div className="px-[0.75rem] py-[0.5rem]">
                 {selected.issues.length === 0 ? (
                   <div className="flex items-center gap-[0.5rem] py-[0.5rem]">
-                    <CheckCircle2 className="size-[0.875rem] shrink-0 text-da-success" strokeWidth={2.2} />
+                    <CheckCircle2
+                      className="size-[0.875rem] shrink-0 text-da-success"
+                      strokeWidth={2.2}
+                    />
                     <span className="text-2xs font-medium leading-[1.4] text-da-muted">
-                      Pass completed without anomaly. Nothing to report for compliance.
+                      Pass completed without anomaly. Nothing to report for
+                      compliance.
                     </span>
                   </div>
                 ) : (
