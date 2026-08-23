@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
+import { SettingsButton } from "@/features/shell/SettingsButton";
 import { PASSES, SCHEDULE_STATS } from "../data/schedule";
 import { loadedConflicts } from "../lib/live";
 import { useSimStore } from "../store/simStore";
@@ -142,6 +143,7 @@ export function SchedulerShell({ children }: { children: ReactNode }) {
             {target.label}
           </Link>
 
+          <SettingsButton />
           <ThemeToggle />
         </div>
       </header>

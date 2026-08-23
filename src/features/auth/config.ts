@@ -13,8 +13,13 @@ export const authConfig = {
     blurb:
       "Every log, record, task and alert the array produces — archived, verified and searchable from one board.",
   },
-  /** Where an authenticated visitor lands when no `next` was requested. */
-  homePath: "/",
+  /**
+   * Where an authenticated visitor lands when no `next` was requested.
+   *
+   * The array monitor, not a home page — there is no home page. Signing in is
+   * a means to reaching a console, so it delivers you to one.
+   */
+  homePath: "/monitor/array",
   loginPath: "/auth/login",
   registerPath: "/auth/register",
   forgotPath: "/auth/forgot",

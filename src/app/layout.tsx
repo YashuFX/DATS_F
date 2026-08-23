@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SectionNav } from "@/features/shell/SectionNav";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -25,7 +26,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Sets data-theme before first paint. See lib/theme.ts. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        {/* Floats over every console; hides itself on the auth screens. */}
+        <SectionNav />
+      </body>
     </html>
   );
 }

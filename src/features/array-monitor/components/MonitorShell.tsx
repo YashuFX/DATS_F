@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
+import { SettingsButton } from "@/features/shell/SettingsButton";
 import { ARRAY_TOTALS } from "../data/tiles";
 import { siteAlarms } from "../data/infrastructure";
 
@@ -139,6 +140,7 @@ export function MonitorShell({ children }: { children: ReactNode }) {
               {alarms.length} {alarms.length === 1 ? "alarm" : "alarms"}
             </span>
           </Link>
+          <SettingsButton />
           <ThemeToggle />
         </div>
       </header>

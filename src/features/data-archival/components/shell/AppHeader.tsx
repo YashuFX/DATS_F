@@ -3,6 +3,7 @@
 import { Archive, Bell, ChevronDown, Clock, Database, HardDrive, ListChecks, Settings, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { archivalConfig } from "../../config";
+import { SettingsButton } from "@/features/shell/SettingsButton";
 import { ThemeToggle } from "./ThemeToggle";
 import { useDemoClock } from "../../hooks/useDemoClock";
 import { cn } from "../../lib/cn";
@@ -150,6 +151,7 @@ export function AppHeader() {
           </span>
         </div>
 
+        <SettingsButton />
         <ThemeToggle />
 
         <button
