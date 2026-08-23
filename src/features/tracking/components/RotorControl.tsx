@@ -61,7 +61,7 @@ export default function RotorControl() {
           ROTOR S.A.T.
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center justify-between bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da px-3 py-1.5 text-xs font-mono font-bold text-da-text shadow-inner min-w-0">
+          <div className="flex-1 flex items-center justify-between bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da px-2.5 py-1 text-[11px] font-mono font-bold text-da-text shadow-inner min-w-0">
             {isEditingIp ? (
               <input
                 type="text"
@@ -78,13 +78,13 @@ export default function RotorControl() {
                   }
                 }}
                 aria-label="Rotor address"
-                className="text-xs font-mono font-bold bg-transparent text-da-text focus:outline-none w-full"
+                className="text-[11px] font-mono font-bold bg-transparent text-da-text focus:outline-none w-full"
                 autoFocus
               />
             ) : (
               <div
                 onClick={() => setIsEditingIp(true)}
-                className="text-xs font-mono font-bold text-da-text w-full cursor-pointer flex items-center justify-between"
+                className="text-[11px] font-mono font-bold text-da-text w-full cursor-pointer flex items-center justify-between"
               >
                 <span className="truncate">{rotorIp}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-da-muted shrink-0 ml-1" />
@@ -95,9 +95,9 @@ export default function RotorControl() {
           <button 
             onClick={() => setIsEditingIp(true)}
             aria-label="Edit rotor address"
-            className="p-1.5 rounded-da bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer flex items-center justify-center shrink-0 w-8 h-8 sm:w-9 sm:h-9 border border-blue-500/40 shadow-sm"
+            className="p-1.5 rounded-da bg-blue-600 hover:bg-blue-500 text-da-on-brand transition-colors cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 border border-da-info/40 shadow-sm"
           >
-            <Settings className="h-4 w-4 text-white" />
+            <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -106,10 +106,10 @@ export default function RotorControl() {
       <div className="flex items-center justify-around w-full grow py-1 gap-2 min-h-0">
         {/* Azimuth Dial & Readout Column */}
         <div className="flex flex-col items-center justify-center flex-1 min-w-0">
-          <div className="relative w-28 h-28 sm:w-32 sm:h-32 max-w-[7.5rem] max-h-[7.5rem] aspect-square flex items-center justify-center">
+          <div className="relative aspect-square w-full max-w-[8.75rem] flex items-center justify-center">
             <svg className="w-full h-full overflow-visible" viewBox="-6 -6 112 112">
               {/* Outer circle */}
-              <circle cx="50" cy="50" r="40" className="fill-da-bg dark:fill-[#0b1320] stroke-da-border dark:stroke-[#1e293b]" strokeWidth="1.5" />
+              <circle cx="50" cy="50" r="40" className="fill-da-bg dark:fill-da-field stroke-da-border dark:stroke-da-border" strokeWidth="1.5" />
               <circle cx="50" cy="50" r="44" fill="none" className="stroke-da-border opacity-40" strokeWidth="1" />
 
               {/* Dynamic Green Sweep Arc */}
@@ -120,7 +120,7 @@ export default function RotorControl() {
                 return (
                   <path
                     d={`M 50 50 L 50 10 A 40 40 0 ${displayAz > 180 ? 1 : 0} 1 ${endX} ${endY} Z`}
-                    fill="#10b981"
+                    fill="var(--color-da-success)"
                     fillOpacity="0.18"
                     stroke="none"
                   />
@@ -142,26 +142,26 @@ export default function RotorControl() {
 
               {/* Azimuth Needle */}
               <g transform={`rotate(${azimuthRotation} 50 50)`}>
-                <line x1="50" y1="50" x2="50" y2="13" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
-                <polygon points="50,9 46.5,14 53.5,14" fill="#ef4444" />
+                <line x1="50" y1="50" x2="50" y2="13" stroke="var(--color-da-danger)" strokeWidth="2.5" strokeLinecap="round" />
+                <polygon points="50,9 46.5,14 53.5,14" fill="var(--color-da-danger)" />
               </g>
               {/* Center Pivot */}
-              <circle cx="50" cy="50" r="4.5" fill="#ef4444" />
+              <circle cx="50" cy="50" r="4.5" fill="var(--color-da-danger)" />
             </svg>
           </div>
           {/* AZ Readout directly under Azimuth dial */}
           <div className="text-center font-mono mt-0.5">
-            <span className="text-da-muted text-xs font-bold mr-1">AZ:</span>
-            <span className="text-da-text text-lg sm:text-xl font-black tracking-tight da-nums">{displayAz.toFixed(1)}°</span>
+            <span className="text-da-muted text-[10px] font-bold mr-1">AZ:</span>
+            <span className="text-da-text text-base font-black tracking-tight da-nums">{displayAz.toFixed(1)}°</span>
           </div>
         </div>
 
         {/* Elevation Dial & Readout Column */}
         <div className="flex flex-col items-center justify-center flex-1 min-w-0">
-          <div className="relative w-28 h-28 sm:w-32 sm:h-32 max-w-[7.5rem] max-h-[7.5rem] aspect-square flex items-center justify-center">
+          <div className="relative aspect-square w-full max-w-[8.75rem] flex items-center justify-center">
             <svg className="w-full h-full overflow-visible" viewBox="-6 -6 112 112">
               {/* Background quadrant wedge */}
-              <path d="M 15 85 L 83 85 A 68 68 0 0 0 15 17 Z" className="fill-[#042819]/80 stroke-da-border" strokeWidth="1.5" />
+              <path d="M 15 85 L 83 85 A 68 68 0 0 0 15 17 Z" className="fill-da-success-soft/80 stroke-da-border" strokeWidth="1.5" />
 
               {/* Dynamic green sweep arc for elevation */}
               {(() => {
@@ -172,7 +172,7 @@ export default function RotorControl() {
                 return (
                   <path
                     d={`M 15 85 L 85 85 A 68 68 0 0 0 ${endX} ${endY} Z`}
-                    fill="#10b981"
+                    fill="var(--color-da-success)"
                     fillOpacity="0.25"
                     stroke="none"
                   />
@@ -197,18 +197,18 @@ export default function RotorControl() {
 
               {/* Elevation Needle */}
               <g transform={`rotate(${-displayEl} 15 85)`}>
-                <line x1="15" y1="85" x2="83" y2="85" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
-                <polygon points="83,85 78,81.5 78,88.5" fill="#ef4444" />
+                <line x1="15" y1="85" x2="83" y2="85" stroke="var(--color-da-danger)" strokeWidth="2.5" strokeLinecap="round" />
+                <polygon points="83,85 78,81.5 78,88.5" fill="var(--color-da-danger)" />
                 <path d="M 89 85 L 85 81 M 89 85 L 85 89" fill="none" className="stroke-da-muted" strokeWidth="1.25" />
               </g>
               {/* Center Pivot */}
-              <circle cx="15" cy="85" r="4.5" fill="#ef4444" />
+              <circle cx="15" cy="85" r="4.5" fill="var(--color-da-danger)" />
             </svg>
           </div>
           {/* EL Readout directly under Elevation dial */}
           <div className="text-center font-mono mt-0.5">
-            <span className="text-da-muted text-xs font-bold mr-1">EL:</span>
-            <span className="text-da-text text-lg sm:text-xl font-black tracking-tight da-nums">{displayEl.toFixed(1)}°</span>
+            <span className="text-da-muted text-[10px] font-bold mr-1">EL:</span>
+            <span className="text-da-text text-base font-black tracking-tight da-nums">{displayEl.toFixed(1)}°</span>
           </div>
         </div>
       </div>
@@ -250,7 +250,7 @@ export default function RotorControl() {
         {/* TRACKING banner button */}
         <button
           onClick={() => setRotorTracking(!rotorTracking)}
-          className="w-full py-1.5 bg-[#4ade80] hover:bg-[#22c55e] text-black font-extrabold text-[11px] uppercase tracking-wider rounded-da transition-colors cursor-pointer shadow-sm flex items-center justify-center"
+          className="w-full py-1.5 bg-da-success hover:bg-da-success/90 text-da-on-brand font-extrabold text-[11px] uppercase tracking-wider rounded-da transition-colors cursor-pointer shadow-sm flex items-center justify-center"
         >
           TRACKING
         </button>
@@ -259,7 +259,7 @@ export default function RotorControl() {
         <div className="grid grid-cols-3 gap-1.5">
           <button
             onClick={() => setRotorConnected('connected')}
-            className={`py-1.5 rounded-da text-[10.5px] sm:text-[11px] font-black uppercase tracking-tight text-center transition-all cursor-pointer ${
+            className={`py-1.5 rounded-da text-[10px] font-bold uppercase text-center transition-all cursor-pointer ${
               rotorConnected === 'connected'
                 ? 'bg-da-bg text-da-label border-[max(1px,0.0625rem)] border-da-border'
                 : 'bg-da-bg border-[max(1px,0.0625rem)] border-da-border text-da-text hover:bg-da-bg/80'
@@ -271,14 +271,14 @@ export default function RotorControl() {
 
           <button
             onClick={() => setRotorConnected('disconnected')}
-            className="py-1.5 rounded-da text-[10.5px] sm:text-[11px] font-black uppercase tracking-tight text-center bg-da-danger hover:bg-da-danger/90 text-white shadow-sm transition-all cursor-pointer"
+            className="py-1.5 rounded-da text-[10px] font-bold uppercase text-center bg-da-danger hover:bg-da-danger/90 text-da-on-brand shadow-sm transition-all cursor-pointer"
           >
             DISCONNECT
           </button>
 
           <button
             onClick={handlePark}
-            className="py-1.5 rounded-da text-[10.5px] sm:text-[11px] font-black uppercase tracking-tight text-center bg-da-warn hover:bg-da-warn/90 text-black shadow-sm transition-all cursor-pointer"
+            className="py-1.5 rounded-da text-[10px] font-bold uppercase text-center bg-da-warn hover:bg-da-warn/90 text-black shadow-sm transition-all cursor-pointer"
           >
             {rotorConnected === 'parking' ? 'PARKING...' : 'PARK'}
           </button>
@@ -288,7 +288,7 @@ export default function RotorControl() {
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={() => setRotorTracking(true)}
-            className={`py-2 rounded-da text-[10.5px] sm:text-[11px] font-black uppercase tracking-tight text-center transition-all cursor-pointer ${
+            className={`py-1.5 rounded-da text-[10px] font-bold uppercase text-center transition-all cursor-pointer ${
               rotorTracking
                 ? 'bg-da-bg text-da-label border-[max(1px,0.0625rem)] border-da-border'
                 : 'bg-da-bg border-[max(1px,0.0625rem)] border-da-border text-da-text hover:bg-da-bg/80'
@@ -304,7 +304,7 @@ export default function RotorControl() {
               setManualOffsetAz(0);
               setManualOffsetEl(0);
             }}
-            className="py-2 rounded-da text-[11px] sm:text-xs font-black uppercase tracking-wider text-center bg-da-danger hover:bg-da-danger/90 text-white shadow-md transition-all cursor-pointer"
+            className="py-1.5 rounded-da text-[10px] font-bold uppercase text-center bg-da-danger hover:bg-da-danger/90 text-da-on-brand shadow-md transition-all cursor-pointer"
           >
             STOP
           </button>

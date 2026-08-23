@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthGuard } from "@/features/auth";
 import { ThemeProvider } from "@/features/tracking";
 
 export const metadata: Metadata = {
@@ -8,6 +9,8 @@ export const metadata: Metadata = {
 
 export default function TrackingLayout({ children }: LayoutProps<"/tracking">) {
   return (
-    <ThemeProvider>{children}</ThemeProvider>
+    <AuthGuard>
+      <ThemeProvider>{children}</ThemeProvider>
+    </AuthGuard>
   );
 }

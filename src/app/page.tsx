@@ -15,6 +15,18 @@ const SCREENS = [
     detail: "Archive browser — logs, tasks, alerts, reports and exports",
     status: "Built",
   },
+  {
+    href: "/monitor/array",
+    name: "Array Monitor",
+    detail: "Subarray tiles — element health, calibration and beam loading",
+    status: "Built",
+  },
+  {
+    href: "/tracking",
+    name: "Satellite Tracking",
+    detail: "Ground-control console — map, rotor, radio, passes and events",
+    status: "Built",
+  },
 ];
 
 export default function Home() {

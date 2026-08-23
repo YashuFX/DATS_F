@@ -84,9 +84,9 @@ export default function RadioControl() {
           </div>
           <button 
             aria-label="Radio Rig Settings"
-            className="p-1.5 rounded-da bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer flex items-center justify-center shrink-0 w-8 h-8 sm:w-9 sm:h-9 border border-blue-500/40 shadow-sm"
+            className="p-1.5 rounded-da bg-blue-600 hover:bg-blue-500 text-da-on-brand transition-colors cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 border border-da-info/40 shadow-sm"
           >
-            <Settings className="h-4 w-4 text-white" />
+            <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -97,7 +97,7 @@ export default function RadioControl() {
           Transmitter
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center justify-between bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da px-3 py-1.5 text-xs font-mono font-bold text-da-text truncate">
+          <div className="flex-1 flex items-center justify-between bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da px-2.5 py-1 text-[11px] font-mono font-bold text-da-text truncate">
             <span className="truncate">Mode V/U FM - Voice Repeater CTCSS 67.0</span>
           </div>
           <button className="px-2 py-1 text-[10px] font-mono font-bold bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da text-da-text hover:bg-da-bg/80 transition-colors cursor-pointer flex items-center justify-center h-8 shrink-0 lowercase">
@@ -125,18 +125,18 @@ export default function RadioControl() {
       </div>
 
       {/* Clean Green Monospace LED Box */}
-      <div className="bg-[#03150d] border border-[#10b981]/30 rounded-md p-2 my-1.5 flex flex-col gap-1 shrink-0 font-mono">
+      <div className="bg-da-success-soft border border-da-success/30 rounded-md p-2 my-1.5 flex flex-col gap-1 shrink-0 font-mono">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-400 font-semibold text-[10px]">VFO 1</span>
-          <span className="text-[#4ade80] font-black tracking-wider da-nums">{getLiveFrequency(vfo1Freq, false)}</span>
+          <span className="text-da-muted font-semibold text-[10px]">VFO 1</span>
+          <span className="text-da-success font-black tracking-wider da-nums">{getLiveFrequency(vfo1Freq, false)}</span>
         </div>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-400 font-semibold text-[10px]">VFO 2</span>
-          <span className="text-[#4ade80] font-black tracking-wider da-nums">{getLiveFrequency(vfo2Freq, true)}</span>
+          <span className="text-da-muted font-semibold text-[10px]">VFO 2</span>
+          <span className="text-da-success font-black tracking-wider da-nums">{getLiveFrequency(vfo2Freq, true)}</span>
         </div>
-        <div className="flex items-center justify-between text-xs border-t border-[#10b981]/20 pt-1 mt-0.5">
-          <span className="text-slate-400 font-semibold text-[10px]">Doppler shift:</span>
-          <span className="text-[#4ade80] font-black tracking-wider da-nums">{formatDoppler(dopplerShift).replace(/,/g, '.')}</span>
+        <div className="flex items-center justify-between text-xs border-t border-[var(--color-da-success)]/20 pt-1 mt-0.5">
+          <span className="text-da-muted font-semibold text-[10px]">Doppler shift:</span>
+          <span className="text-da-success font-black tracking-wider da-nums">{formatDoppler(dopplerShift).replace(/,/g, '.')}</span>
         </div>
       </div>
 
@@ -146,7 +146,7 @@ export default function RadioControl() {
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={() => setRadioConnected(true)}
-            className={`py-1.5 rounded-da text-[10.5px] sm:text-[11px] font-black uppercase tracking-tight text-center transition-all cursor-pointer ${
+            className={`py-1.5 rounded-da text-[10px] font-bold uppercase text-center transition-all cursor-pointer ${
               radioConnected
                 ? 'bg-da-bg text-da-label border-[max(1px,0.0625rem)] border-da-border'
                 : 'bg-da-bg border-[max(1px,0.0625rem)] border-da-border text-da-text hover:bg-da-bg/80'
@@ -158,7 +158,7 @@ export default function RadioControl() {
 
           <button
             onClick={() => setRadioConnected(false)}
-            className="py-1.5 rounded-da text-[10.5px] sm:text-[11px] font-black uppercase tracking-tight text-center bg-da-danger hover:bg-da-danger/90 text-white shadow-sm transition-all cursor-pointer"
+            className="py-1.5 rounded-da text-[10px] font-bold uppercase text-center bg-da-danger hover:bg-da-danger/90 text-da-on-brand shadow-sm transition-all cursor-pointer"
             disabled={!radioConnected}
           >
             DISCONNECT
@@ -169,7 +169,7 @@ export default function RadioControl() {
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={() => setRadioTracking(true)}
-            className={`py-1.5 rounded-da text-[10.5px] sm:text-[11px] font-black uppercase tracking-tight text-center transition-all cursor-pointer ${
+            className={`py-1.5 rounded-da text-[10px] font-bold uppercase text-center transition-all cursor-pointer ${
               radioTracking
                 ? 'bg-da-bg text-da-label border-[max(1px,0.0625rem)] border-da-border'
                 : 'bg-da-bg border-[max(1px,0.0625rem)] border-da-border text-da-text hover:bg-da-bg/80'
@@ -181,7 +181,7 @@ export default function RadioControl() {
 
           <button
             onClick={() => setRadioTracking(false)}
-            className="py-1.5 rounded-da text-[11px] sm:text-xs font-black uppercase tracking-wider text-center bg-da-danger hover:bg-da-danger/90 text-white shadow-md transition-all cursor-pointer"
+            className="py-1.5 rounded-da text-[10px] font-bold uppercase text-center bg-da-danger hover:bg-da-danger/90 text-da-on-brand shadow-md transition-all cursor-pointer"
             disabled={!radioConnected || !radioTracking}
           >
             STOP
