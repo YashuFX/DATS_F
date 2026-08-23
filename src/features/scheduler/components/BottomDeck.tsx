@@ -148,7 +148,13 @@ export function BottomDeck({
       : 0;
 
   return (
-    <section className="flex h-[11.5rem] shrink-0 gap-[0.875rem] border-t-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem] py-[0.5rem]">
+    /*
+      12.25rem is not arbitrary. The uplink's rows are 1.375rem, and a deck of
+      any other height cuts the last visible one in half, which reads as a
+      rendering fault rather than as a list that scrolls. 12.25 = 1rem of
+      padding + a 1.625rem log header + exactly seven whole rows.
+    */
+    <section className="flex h-[12.25rem] shrink-0 gap-[0.875rem] border-t-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem] py-[0.5rem]">
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Contention banner */}
         <div className="flex shrink-0 items-center justify-between gap-[0.75rem] border-b-[max(1px,0.0625rem)] border-da-border/60 pb-[0.4375rem]">

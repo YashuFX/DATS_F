@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
 import { CONFLICTS, SCHEDULE_STATS } from "../data/schedule";
+import { SchedulerRuntime } from "./SchedulerRuntime";
 
 /**
  * Chrome for the scheduler section.
@@ -33,6 +34,13 @@ export function SchedulerShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-da-bg text-da-text">
+      {/*
+        The clock and the archive watch. Renders nothing, and lives here rather
+        than on the scheduler screen so it survives a move to Task History —
+        a task that finishes while you are reading history still lands in it.
+      */}
+      <SchedulerRuntime />
+
       <header className="flex h-[4rem] shrink-0 items-center justify-between border-b-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem]">
         <div className="flex items-center gap-[0.5rem]">
           <span className="flex size-[2rem] items-center justify-center rounded-[0.375rem] bg-da-brand text-da-on-brand shadow-da-brand-lg">

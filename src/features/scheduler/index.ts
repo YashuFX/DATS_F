@@ -22,4 +22,5 @@ export {
   WINDOW,
 } from "./data/schedule";
 export { usePassHistoryStore } from "./store/passHistoryStore";
+export { useSimStore } from "./store/simStore";
 export * from "./types";

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Database,
   Download,
+  Inbox,
   RotateCcw,
   Search,
   Signal,
@@ -497,6 +498,20 @@ export function TaskHistoryScreen() {
           title="Pass History"
           action={
             <span className="flex shrink-0 items-center gap-[0.625rem]">
+              {/*
+                The archive fills while you watch it — the runtime keeps the
+                clock going on this route too — so say so, or a count that
+                changes on its own looks like a glitch.
+              */}
+              <span className="flex items-center gap-[0.3125rem]">
+                <span className="relative flex size-[0.3125rem]">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-da-success opacity-70" />
+                  <span className="relative inline-flex size-full rounded-full bg-da-success" />
+                </span>
+                <span className="text-3xs font-bold uppercase tracking-[0.08em] text-da-success">
+                  Live
+                </span>
+              </span>
               <span className="da-nums text-3xs font-medium text-da-label">
                 {rows.length} of {records.length} records
               </span>
@@ -687,11 +702,48 @@ export function TaskHistoryScreen() {
               })}
             </tbody>
           </table>
+
+          {/*
+            The archive can legitimately be empty — Refresh clears it, and it
+            refills as tasks finish. Say so, rather than leaving a blank panel
+            that reads as a failure to load.
+          */}
+          {pageRows.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-[0.4375rem] py-[3rem]">
+              <Inbox
+                className="size-[1.375rem] text-da-label"
+                strokeWidth={1.8}
+              />
+              <span className="text-2xs font-bold uppercase tracking-[0.1em] text-da-muted">
+                {records.length === 0
+                  ? "Archive empty"
+                  : "No records match these filters"}
+              </span>
+              <span className="max-w-[24rem] text-center text-2xs font-medium leading-[1.5] text-da-label">
+                {records.length === 0
+                  ? "Passes are logged here as scheduled tasks run past LOS. Leave the scheduler running and the archive refills on its own."
+                  : "Widen the priority, outcome or date filter to bring records back into view."}
+              </span>
+            </div>
+          )}
         </Panel>
       </div>
 
       {/* Record detail */}
       <div className="flex min-h-0 flex-col gap-[0.75rem]">
+        {!selected && (
+          <div className="da-card flex flex-1 flex-col items-center justify-center gap-[0.4375rem] px-[1.25rem] text-center">
+            <Inbox className="size-[1.25rem] text-da-label" strokeWidth={1.8} />
+            <span className="text-2xs font-bold uppercase tracking-[0.1em] text-da-muted">
+              No pass selected
+            </span>
+            <span className="text-2xs font-medium leading-[1.5] text-da-label">
+              Pick a row to read its geometry, link budget and any issues logged
+              during the pass.
+            </span>
+          </div>
+        )}
+
         {selected && (
           <>
             <Panel

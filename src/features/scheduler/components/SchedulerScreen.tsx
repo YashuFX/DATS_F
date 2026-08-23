@@ -1,12 +1,11 @@
 "use client";
 
 import { Grid3x3, ListFilter, Pause, Play, Plus, Rows3 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { CONFLICTS, PASSES, SCHEDULE_STATS } from "../data/schedule";
-import { useArchiveRehydration } from "../hooks/usePassArchive";
-import { useSimClock } from "../hooks/useSimClock";
-import { usePassHistoryStore } from "../store/passHistoryStore";
+import { clockAt, completionLog, liveStateOf } from "../lib/live";
+import { useSimStore } from "../store/simStore";
 import type { LogEntry, SatellitePass } from "../types";
 import { BottomDeck } from "./BottomDeck";
 import { ConstellationExplorer } from "./ConstellationExplorer";
@@ -24,13 +23,6 @@ const FILTERS: StatusFilter[] = [
   "CONFLICT",
   "COMPLETED",
 ];
-
-/** Mission epoch. Fixed, so server and client render the same clock. */
-const MISSION_EPOCH_MS = Date.parse("2026-08-23T09:00:00Z");
-
-/** Mission-clock HH:MM:SS at a given number of elapsed simulated seconds. */
-const clockAt = (elapsedSec: number) =>
-  new Date(MISSION_EPOCH_MS + elapsedSec * 1000).toISOString().slice(11, 19);
 
 const BOOT_LOG: LogEntry[] = [
   {
@@ -84,36 +76,24 @@ export function SchedulerScreen() {
   const [selectedId, setSelectedId] = useState(
     PASSES.find((p) => p.status === "TRACKING")?.id ?? PASSES[0]?.id ?? "",
   );
-  const [paused, setPaused] = useState(false);
-  // A pass runs 6-19 minutes, so at 1x its bar advances about a tenth of a
-  // percent per second — real, but indistinguishable from frozen. The console
-  // opens at 20x, where a pass plays out in well under a minute, and 1x stays
-  // available for reading the true rate.
-  const [speed, setSpeed] = useState(20);
-  const [operatorLog, setOperatorLog] = useState<LogEntry[]>([]);
-
-  const elapsedSec = useSimClock({ paused, speed });
-
   /**
-   * The window as it stands *now*. A pass keeps its booked duration; what
-   * changes is how far it sits from the playhead, and a conflict stays a
-   * conflict because contention is a property of the booking, not of time.
+   * The clock is the runtime's, not this screen's.
+   *
+   * `SchedulerRuntime` — mounted in the section layout above both routes — owns
+   * it and does the archiving, so tasks keep completing into Task History while
+   * you are reading Task History. This screen just reads it.
    */
+  const elapsedSec = useSimStore((s) => s.elapsedSec);
+  const paused = useSimStore((s) => s.paused);
+  const speed = useSimStore((s) => s.speed);
+  const operatorLog = useSimStore((s) => s.operatorLog);
+  const setPaused = useSimStore((s) => s.setPaused);
+  const setSpeed = useSimStore((s) => s.setSpeed);
+  const logEvent = useSimStore((s) => s.logEvent);
+
+  /** The window as it stands *now*, from the same derivation the runtime archives on. */
   const livePasses = useMemo(
-    () =>
-      PASSES.map((pass) => {
-        const aosOffsetSec = pass.aosOffsetSec - elapsedSec;
-        const sinceAos = -aosOffsetSec;
-        const status: SatellitePass["status"] =
-          pass.status === "CONFLICT"
-            ? "CONFLICT"
-            : sinceAos >= pass.durationSec
-              ? "COMPLETED"
-              : sinceAos > 0
-                ? "TRACKING"
-                : "SCHEDULED";
-        return { ...pass, aosOffsetSec, status };
-      }),
+    () => PASSES.map((pass) => liveStateOf(pass, elapsedSec)),
     [elapsedSec],
   );
 
@@ -128,35 +108,6 @@ export function SchedulerScreen() {
   const activePass = livePasses.find((p) => p.id === selectedId) ?? null;
 
   /**
-   * Hand finished passes to the archive.
-   *
-   * This is the one direction data flows between the two screens: a task that
-   * runs past its LOS stops being the scheduler's concern and becomes a history
-   * record. `seenRef` is seeded on the first tick with whatever was already
-   * finished when the console opened, so only passes that complete *while you
-   * are watching* are logged, and the store's own id check makes the call
-   * idempotent across the twenty ticks a second that observe the same event.
-   */
-  const archivePass = usePassHistoryStore((s) => s.archivePass);
-  useArchiveRehydration();
-  const seenRef = useRef<Set<string> | null>(null);
-
-  useEffect(() => {
-    const finished = livePasses.filter((p) => p.status === "COMPLETED");
-
-    if (seenRef.current === null) {
-      seenRef.current = new Set(finished.map((p) => p.id));
-      return;
-    }
-
-    for (const pass of finished) {
-      if (seenRef.current.has(pass.id)) continue;
-      seenRef.current.add(pass.id);
-      archivePass(pass, MISSION_EPOCH_MS + elapsedSec * 1000);
-    }
-  }, [livePasses, elapsedSec, archivePass]);
-
-  /**
    * The command uplink, newest first.
    *
    * Completions are derived from the clock rather than pushed into state as
@@ -168,16 +119,7 @@ export function SchedulerScreen() {
   const logs = useMemo<LogEntry[]>(() => {
     const completions = livePasses
       .filter((p) => p.status === "COMPLETED")
-      .map<LogEntry>((pass) => ({
-        // Completion happened `durationSec` after this pass's AOS, which is
-        // itself `elapsedSec + aosOffsetSec` into the mission.
-        time: clockAt(elapsedSec + pass.aosOffsetSec + pass.durationSec),
-        level: pass.linkLock === "UNLOCKED" ? "WARN" : "ACQ",
-        message:
-          pass.linkLock === "UNLOCKED"
-            ? `LOS — ${pass.satName} ended unlocked on ${pass.antennaId}, no data recovered`
-            : `LOS — ${pass.satName} complete on ${pass.antennaId}, ${pass.downlinkedMb} MB archived`,
-      }));
+      .map<LogEntry>((pass) => completionLog(pass, elapsedSec));
 
     // HH:MM:SS sorts lexicographically in clock order within the day.
     return [...completions, ...operatorLog, ...BOOT_LOG].sort((a, b) =>
@@ -189,14 +131,11 @@ export function SchedulerScreen() {
   const missionClock = clockAt(elapsedSec);
 
   const autoResolve = () =>
-    setOperatorLog((prev) => [
-      {
-        time: clockAt(elapsedSec),
-        level: "PLAN",
-        message: `Auto-resolve — ${CONFLICTS.length} contention(s) re-planned onto the next free antenna`,
-      },
-      ...prev,
-    ]);
+    logEvent({
+      time: clockAt(elapsedSec),
+      level: "PLAN",
+      message: `Auto-resolve — ${CONFLICTS.length} contention(s) re-planned onto the next free antenna`,
+    });
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -291,7 +230,7 @@ export function SchedulerScreen() {
           <span className="flex items-center gap-[0.125rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border bg-da-field p-[0.1875rem]">
             <button
               type="button"
-              onClick={() => setPaused((v) => !v)}
+              onClick={() => setPaused(!paused)}
               title={paused ? "Resume" : "Pause"}
               className="flex size-[1.375rem] cursor-pointer items-center justify-center rounded-[0.1875rem] text-da-muted transition-colors hover:bg-da-subtle hover:text-da-text"
             >
