@@ -187,7 +187,7 @@ export function ReportsScreen() {
               icon: <FileStack className="size-[1rem]" strokeWidth={2} />,
             },
             {
-              label: "Scheduled",
+              label: "Scheduled Reports",
               value: String(SEED_REPORT_STATS.scheduled),
               valueTone: "text-da-brand",
               sub: <span className="text-da-muted">next run 23:00 IST</span>,

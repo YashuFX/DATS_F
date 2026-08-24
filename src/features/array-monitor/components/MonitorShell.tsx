@@ -1,101 +1,25 @@
 "use client";
 
-import { Activity, Cpu, Network, Radar, Sliders, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Radar, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
-import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
-import { SettingsButton } from "@/features/shell/SettingsButton";
 import { ARRAY_TOTALS } from "../data/tiles";
 import { siteAlarms } from "../data/infrastructure";
 
 /**
- * Chrome for every /monitor screen: wordmark rail on top, console modules down
- * the left, status line along the bottom.
+ * Chrome for every /monitor screen: wordmark rail on top, content in the full
+ * available width, and a status line along the bottom.
  *
- * Sized to the same canvas as the archival board — 4rem header, 13.75rem rail,
- * 2.75rem footer, everything in rem — so it inherits the root font-size clamp
- * in `globals.css` and scales to 4K without a single breakpoint.
+ * Sized to the same canvas as the archival board — 4rem header and 2.75rem
+ * footer, everything in rem — so it inherits the root font-size clamp in
+ * `globals.css` and scales to 4K without a single breakpoint.
  */
-
-// No "Overview" entry: the side rail, the footer and this header already carry
-// the site rollup, so a landing page would only restate them. Alarms surface in
-// the header instead, where they are visible from every screen rather than from
-// one an operator has to navigate to.
-const MODULES = [
-  { code: "01", label: "Array Grid", href: "/monitor/array", icon: Activity },
-  { code: "02", label: "LRU Chassis", href: "/monitor/lru", icon: Cpu },
-  { code: "03", label: "RFSoC Monitor", href: "/monitor/rfsoc", icon: Sliders },
-  { code: "04", label: "Infrastructure", href: "/monitor/infrastructure", icon: Network },
-];
-
-function SidePanel() {
-  const pathname = usePathname();
-
-  return (
-    <aside className="flex w-[13.75rem] shrink-0 flex-col justify-between border-r-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.625rem] py-[0.75rem]">
-      <div className="flex flex-col gap-[0.25rem]">
-        <span className="px-[0.5rem] pb-[0.5rem] text-3xs font-bold uppercase tracking-[0.16em] text-da-label">
-          Console Modules
-        </span>
-
-        {MODULES.map((m) => {
-          const Icon = m.icon;
-          const active = pathname === m.href || pathname.startsWith(`${m.href}/`);
-
-          return (
-            <Link
-              key={m.href}
-              href={m.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "group relative flex items-center gap-[0.5rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] px-[0.5rem] py-[0.5rem] transition-colors",
-                active
-                  ? "border-da-brand/40 bg-da-brand-soft text-da-brand"
-                  : "border-transparent text-da-muted hover:bg-da-subtle hover:text-da-text",
-              )}
-            >
-              <span
-                className={cn(
-                  "da-nums text-3xs font-bold",
-                  active ? "text-da-brand" : "text-da-label",
-                )}
-              >
-                {m.code}
-              </span>
-              <Icon className="size-[0.875rem] shrink-0" strokeWidth={2} />
-              <span className="truncate text-2xs font-bold uppercase tracking-[0.06em]">
-                {m.label}
-              </span>
-              {active && (
-                <span className="absolute right-[0.5rem] size-[0.3125rem] rounded-full bg-da-brand" />
-              )}
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-col gap-[0.375rem] border-t-[max(1px,0.0625rem)] border-da-border pt-[0.625rem]">
-        {[
-          ["Station", "Online", "text-da-success"],
-          ["BITE Test", "Passed", "text-da-success"],
-          ["Availability", `${ARRAY_TOTALS.availabilityPercent.toFixed(1)}%`, "text-da-text"],
-        ].map(([label, value, tone]) => (
-          <span key={label} className="flex items-center justify-between px-[0.5rem]">
-            <span className="text-3xs font-medium uppercase tracking-[0.08em] text-da-label">
-              {label}
-            </span>
-            <span className={cn("da-nums text-3xs font-bold", tone)}>{value}</span>
-          </span>
-        ))}
-      </div>
-    </aside>
-  );
-}
-
 export function MonitorShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const alarms = siteAlarms();
+  const isArrayHome = pathname === "/monitor/array";
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-da-bg text-da-text">
@@ -116,6 +40,18 @@ export function MonitorShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex items-center gap-[0.875rem]">
+          {!isArrayHome && (
+            <Link
+              href="/monitor/array"
+              title="Back to Array Monitor"
+              className="flex items-center gap-[0.375rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border px-[0.5rem] py-[0.25rem] text-da-muted transition-colors hover:border-da-brand hover:bg-da-brand-soft hover:text-da-brand"
+            >
+              <ArrowLeft className="size-[0.8125rem]" strokeWidth={2.2} />
+              <span className="text-3xs font-bold uppercase tracking-[0.08em]">
+                Back to Array
+              </span>
+            </Link>
+          )}
           <span className="flex items-center gap-[0.375rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-success/35 bg-da-success-soft px-[0.5rem] py-[0.25rem]">
             <span className="relative flex size-[0.375rem]">
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-da-success opacity-70" />
@@ -140,15 +76,10 @@ export function MonitorShell({ children }: { children: ReactNode }) {
               {alarms.length} {alarms.length === 1 ? "alarm" : "alarms"}
             </span>
           </Link>
-          <SettingsButton />
-          <ThemeToggle />
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <SidePanel />
-        <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
-      </div>
+      <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
 
       <footer className="flex h-[2.75rem] shrink-0 items-center justify-between border-t-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem]">
         <span className="flex items-center gap-[1.5rem]">

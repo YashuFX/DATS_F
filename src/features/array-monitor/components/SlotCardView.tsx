@@ -41,15 +41,12 @@ export function SlotCardView({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => {
-        onSelect();
-        if (onOpen) onOpen();
-      }}
+      onClick={onSelect}
+      onDoubleClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect();
-          if (onOpen) onOpen();
         }
       }}
       aria-pressed={selected}

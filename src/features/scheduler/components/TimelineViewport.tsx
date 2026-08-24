@@ -74,7 +74,7 @@ export function TimelineViewport({
       {/* Aperture utilisation pressure strip */}
       <div className="da-card mb-[0.625rem] flex shrink-0 items-center justify-between gap-[0.75rem] px-[0.625rem] py-[0.5rem]">
         <div className="flex items-center gap-[0.875rem]">
-          <span className="text-3xs font-bold uppercase tracking-[0.14em] text-da-muted">
+          {/* <span className="text-3xs font-bold uppercase tracking-[0.14em] text-da-muted">
             Aperture Utilisation
           </span>
           <span className="flex items-center gap-[0.4375rem]">
@@ -91,7 +91,7 @@ export function TimelineViewport({
             <span className="da-nums w-[2.25rem] text-right text-2xs font-bold text-da-text">
               {utilisation}%
             </span>
-          </span>
+          </span> */}
         </div>
 
         <div className="flex gap-[0.875rem] text-3xs font-bold uppercase tracking-[0.08em] text-da-muted">
@@ -99,11 +99,11 @@ export function TimelineViewport({
             Transmitter state: <span className="text-da-success">Online</span>
           </span>
           <span>
-            Duty cycle limit: <span className="text-da-brand">10.0% max</span>
+            Duty cycle: <span className="text-da-brand">10.0%</span>
           </span>
-          <span>
+          {/* <span>
             Stabilisation gap: <span className="text-da-text">1.0 ms</span>
-          </span>
+          </span> */}
         </div>
       </div>
 

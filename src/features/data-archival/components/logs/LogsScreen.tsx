@@ -194,7 +194,7 @@ export function LogsScreen() {
 
         <Card className="min-h-0 flex-1">
           <CardHeader
-            title="Top Error Sources (24h)"
+            title="Top Log Sources (24h)"
             action={<Button variant="link">View All</Button>}
           />
           <ul className="min-h-0 flex-1 divide-y-[max(1px,0.0625rem)] divide-da-border/70 overflow-y-auto">
