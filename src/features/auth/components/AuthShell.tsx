@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
 import { BrandPanel } from "./BrandPanel";
 
 /**
@@ -20,10 +19,6 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <BrandPanel />
 
       <main className="relative flex w-[30rem] shrink-0 flex-col justify-center px-[3rem] py-[2.5rem]">
-        <div className="absolute right-[1.5rem] top-[1.5rem]">
-          <ThemeToggle />
-        </div>
-
         {children}
 
         <footer className="mt-[2rem] flex items-center justify-between text-3xs font-medium uppercase tracking-[0.08em] text-da-label">

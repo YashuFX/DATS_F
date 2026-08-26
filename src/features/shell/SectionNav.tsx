@@ -54,9 +54,8 @@ export function SectionNav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Auth screens have nothing to navigate between, and the settings screen
-  // reaches everything through its own back link. An operator can also retire
-  // the compass entirely from Settings → Console.
+  // Auth screens have nothing to navigate between. An operator can also retire
+  // the compass entirely from Settings -> Console.
   if (pathname.startsWith("/auth") || !showSectionNav) return null;
 
   return (

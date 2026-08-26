@@ -3,11 +3,12 @@ import {
   CalendarClock,
   Crosshair,
   LayoutGrid,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
 /**
- * The four things this application is.
+ * The top-level destinations in this application.
  *
  * One entry per section, not per screen: the drill-downs under a section
  * (`/monitor/lru`, `/task-history`) are reached from inside it, so listing them
@@ -56,6 +57,14 @@ export const SECTIONS: Section[] = [
     match: "/data-archival",
     icon: Archive,
     blurb: "Records, logs, alerts, reports and exports",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    href: "/settings",
+    match: "/settings",
+    icon: Settings,
+    blurb: "Operator preferences and console configuration",
   },
 ];
 

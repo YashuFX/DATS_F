@@ -1,16 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Settings, Sun, Moon, User } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { ShieldCheck, User } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
-import { useTheme } from '../context/ThemeContext';
 
 export default function Header() {
   const { mode, setMode, stationCoords } = useDashboard();
-  const { theme, toggleTheme } = useTheme();
-  const pathname = usePathname();
   const [time, setTime] = useState<string>('09:03:00');
   const [date, setDate] = useState<string>('20 May 2025 EEST');
 
@@ -107,7 +102,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Right side: Time, Theme, Actions */}
+      {/* Right side: Time and actions */}
       <div className="flex items-center justify-end gap-6">
         {/* Date and Time */}
         <div className="flex flex-col items-end justify-center">
@@ -119,26 +114,7 @@ export default function Header() {
           </span>
         </div>
 
-        {/* Theme Toggle & Quick Actions */}
         <div className="flex items-center gap-2 border-l-[max(1px,0.0625rem)] border-da-border pl-4 h-8">
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 rounded-da text-da-muted hover:text-da-text hover:bg-da-bg transition-all cursor-pointer"
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
-            {theme === 'dark' ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
-          </button>
-
-          {/* This gear was decorative in the migrated console. It goes to Settings now. */}
-          <Link
-            href={`/settings?from=${encodeURIComponent(pathname)}`}
-            title="Settings"
-            aria-label="Settings"
-            className="p-1.5 rounded-da text-da-muted hover:text-da-text hover:bg-da-bg transition-all cursor-pointer"
-          >
-            <Settings className="h-4.5 w-4.5" />
-          </Link>
-
           <div className="h-7 w-7 rounded-full bg-da-info/10 border-[max(1px,0.0625rem)] border-da-info/20 flex items-center justify-center text-da-info hover:bg-da-info hover:text-white transition-all cursor-pointer overflow-hidden ml-1">
             <User className="h-4 w-4" />
           </div>

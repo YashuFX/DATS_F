@@ -61,16 +61,16 @@ export default function RotorControl() {
   };
 
   return (
-    <section className="rotor-control da-card flex flex-col justify-between h-full min-h-0 p-3 select-none overflow-hidden text-da-text font-sans" aria-label="Rotor control">
+    <section className="rotor-control da-card flex flex-col justify-between h-full min-h-0 p-3 select-none overflow-hidden text-da-text font-sans" aria-label="Beam Info">
       {/* Header (ROTOR CONTROL title only) */}
       <div className="flex items-center justify-between pb-1.5 shrink-0 border-b border-da-border">
         <span className="text-xs font-black uppercase tracking-wider text-da-text">
-          ROTOR CONTROL
+          BEAM INFO
         </span>
       </div>
 
       {/* Connection Row (ROTOR S.A.T. + IP Select + Settings Button) */}
-      <div className="shrink-0 my-1">
+      {/* <div className="shrink-0 my-1">
         <div className="text-[10px] font-extrabold text-da-muted uppercase tracking-wider mb-0.5">
           ROTOR S.A.T.
         </div>
@@ -103,7 +103,7 @@ export default function RotorControl() {
             <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Settings Panel (collapsible) */}
       {settingsOpen && (

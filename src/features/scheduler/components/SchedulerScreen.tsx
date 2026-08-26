@@ -223,14 +223,14 @@ export function SchedulerScreen() {
         </div>
 
         <div className="flex items-center gap-[0.875rem]">
-          <span className="flex items-center gap-[0.875rem]">
+          {/* <span className="flex items-center gap-[0.875rem]">
             {[
-              [
-                "Booked",
-                `${new Set(livePasses.map((p) => p.satName)).size} / ${SCHEDULE_STATS.satelliteCapacity}`,
-              ],
-              ["Tasks", `${visible.length}`],
-              ["Resolution", `${SCHEDULE_STATS.resolutionMs} ms`],
+              // [
+              //   "Booked",
+              //   `${new Set(livePasses.map((p) => p.satName)).size} / ${SCHEDULE_STATS.satelliteCapacity}`,
+              // ],
+              // ["Tasks", `${visible.length}`],
+              // ["Resolution", `${SCHEDULE_STATS.resolutionMs} ms`],
             ].map(([label, value]) => (
               <span key={label} className="flex flex-col leading-none">
                 <span className="text-3xs font-medium uppercase tracking-[0.08em] text-da-label">
@@ -241,7 +241,7 @@ export function SchedulerScreen() {
                 </span>
               </span>
             ))}
-          </span>
+          </span> */}
 
           <span className="flex flex-col leading-none">
             <span className="text-3xs font-medium uppercase tracking-[0.08em] text-da-label">

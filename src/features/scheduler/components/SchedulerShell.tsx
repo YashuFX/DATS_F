@@ -1,12 +1,8 @@
 "use client";
 
-import { ArrowLeft, History, Radio, Satellite } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Radio, Satellite } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
-import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
-import { SettingsButton } from "@/features/shell/SettingsButton";
 import { loadedConflicts } from "../lib/live";
 import { useSimStore } from "../store/simStore";
 import { SchedulerRuntime } from "./SchedulerRuntime";
@@ -23,9 +19,6 @@ import { SchedulerRuntime } from "./SchedulerRuntime";
  */
 
 export function SchedulerShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const onHistory = pathname.startsWith("/task-history");
-
   /**
    * The status chips describe the scheduler, so they follow its actual state
    * rather than a constant. A cold console reports standby and no contention —
@@ -42,19 +35,6 @@ export function SchedulerShell({ children }: { children: ReactNode }) {
       : initState === "running"
         ? { label: "Initializing", token: "da-brand", pulse: true }
         : { label: "Standby", token: "da-label", pulse: false };
-
-  // One button rather than a rail: with only two screens, a 13.75rem column
-  // spent on a two-item list is width the timeline can use. The button always
-  // points at the screen you are not on — History to go forward into the log,
-  // a back arrow to return.
-  const target = onHistory
-    ? { href: "/scheduler", label: "Scheduler", Icon: ArrowLeft, newTab: false }
-    : {
-        href: "/task-history",
-        label: "Task History",
-        Icon: History,
-        newTab: true,
-      };
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-da-bg text-da-text">
@@ -115,35 +95,6 @@ export function SchedulerShell({ children }: { children: ReactNode }) {
             </span>
           </span>
 
-          {/*
-            Task History opens in its own tab, so the timeline is never given
-            up to read the log — the two are usually wanted side by side.
-
-            It stays live over there: that tab runs its own clock, and the
-            archive's cross-tab listener means passes either tab completes show
-            up in both. The return link is deliberately not a new tab — that
-            direction is an ordinary back-navigation, and stacking tabs every
-            time you cross back would be its own annoyance.
-          */}
-          <Link
-            href={target.href}
-            {...(target.newTab && {
-              target: "_blank",
-              rel: "noopener noreferrer",
-            })}
-            title={
-              target.newTab
-                ? `${target.label} — opens in a new tab`
-                : target.label
-            }
-            className="inline-flex h-[1.75rem] items-center gap-[0.375rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-brand/35 bg-da-brand-soft px-[0.625rem] text-3xs font-bold uppercase tracking-[0.08em] text-da-brand transition-colors hover:bg-da-brand hover:text-da-on-brand"
-          >
-            <target.Icon className="size-[0.6875rem]" strokeWidth={2.4} />
-            {target.label}
-          </Link>
-
-          <SettingsButton />
-          <ThemeToggle />
         </div>
       </header>
 

@@ -53,40 +53,40 @@ export default function Footer() {
         </div>
 
         {/* CPU */}
-        <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
+        {/* <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
           <span className="text-da-label uppercase">CPU</span>
           <div className="flex items-center gap-2">
             <span className="text-da-text da-nums font-bold">42%</span>
             <SignalBars value={2} />
           </div>
-        </div>
+        </div> */}
 
         {/* GPU */}
-        <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
+        {/* <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
           <span className="text-da-label uppercase">GPU</span>
           <div className="flex items-center gap-2">
             <span className="text-da-text da-nums font-bold">35%</span>
             <SignalBars value={2} />
           </div>
-        </div>
+        </div> */}
 
         {/* Memory */}
-        <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
+        {/* <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
           <span className="text-da-label uppercase">Memory</span>
           <div className="flex items-center gap-2">
             <span className="text-da-text da-nums font-bold">62%</span>
             <SignalBars value={3} />
           </div>
-        </div>
+        </div> */}
 
         {/* Data Rate */}
-        <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
+        {/* <div className="flex items-center gap-2 px-4 border-l-[max(1px,0.0625rem)] border-da-border/60 h-5">
           <span className="text-da-label uppercase">Data Rate</span>
           <div className="flex items-center gap-2">
             <span className="text-da-text da-nums font-bold">1.24 Gbps</span>
             <SignalBars value={4} />
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Right side buttons */}

@@ -96,7 +96,7 @@ export default function RadioControl() {
       {/* Header */}
       <div className="flex items-center justify-between gap-1 border-b border-da-border pb-1.5 shrink-0">
         <span className="text-[11px] font-black uppercase tracking-wider text-da-text whitespace-nowrap">
-          RADIO RIG CONTROL
+TELEMETRY STATUS 
         </span>
         <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-da-success">
           <span className="h-1.5 w-1.5 rounded-full bg-da-success animate-pulse shrink-0" />
@@ -108,8 +108,7 @@ export default function RadioControl() {
       {/* Rig Select */}
       <div className="mt-2 shrink-0">
         <div className="text-[10px] font-extrabold text-da-muted uppercase tracking-wider mb-1">
-          Radio rig
-        </div>
+Telemtery         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center justify-between bg-da-bg border-[max(1px,0.0625rem)] border-da-border rounded-da px-3 py-2 text-xs font-mono font-bold text-da-text shadow-inner min-w-0">
             <select
