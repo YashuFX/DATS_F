@@ -82,17 +82,14 @@ class WebGLErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
  * seamlessly to the 2D Unfolded Net View (DomeNetView).
  */
 export function DomeCanvas({
-  activePreset,
+  manualPreset,
   viewMode = "3d",
 }: {
-  activePreset: CameraPreset | null;
+  /** Preset used when nothing is selected — a face selection overrides this internally (see DomeScene). */
+  manualPreset: CameraPreset;
   viewMode?: "3d" | "net";
 }) {
-  const [webGLOk, setWebGLOk] = useState<boolean>(true);
-
-  useEffect(() => {
-    setWebGLOk(detectWebGL());
-  }, []);
+  const [webGLOk, setWebGLOk] = useState<boolean>(detectWebGL);
 
   // Listen for unhandled rejections related to WebGL
   useEffect(() => {
@@ -162,7 +159,7 @@ export function DomeCanvas({
             gl.setClearColor(0x000000, 0);
           }}
         >
-          <DomeScene activePreset={activePreset} />
+          <DomeScene manualPreset={manualPreset} />
         </Canvas>
       </div>
     </WebGLErrorBoundary>

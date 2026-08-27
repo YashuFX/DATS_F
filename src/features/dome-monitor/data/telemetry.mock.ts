@@ -8,6 +8,7 @@
  */
 
 import { PRESENT_FACES } from "./geometry";
+import { worstClusterSize } from "../lib/clustering";
 import type {
   DomeTelemetry,
   DomeTotals,
@@ -77,24 +78,6 @@ function buildFaceElements(
   return elements;
 }
 
-/** Compute the largest connected cluster of failed elements (approximate). */
-function worstCluster(elements: ElementTelemetry[]): number {
-  // Simple: count consecutive failed elements as a rough approximation
-  // A proper implementation would use the lattice adjacency, but for mock data
-  // this is sufficient to show the concept.
-  let maxRun = 0;
-  let run = 0;
-  for (const el of elements) {
-    if (el.health !== "nominal") {
-      run++;
-      maxRun = Math.max(maxRun, run);
-    } else {
-      run = 0;
-    }
-  }
-  return maxRun;
-}
-
 function worstHealth(elements: ElementTelemetry[]): HealthId {
   const hasCritical = elements.some((e) => e.health === "critical");
   if (hasCritical) return "critical";
@@ -103,9 +86,15 @@ function worstHealth(elements: ElementTelemetry[]): HealthId {
   return "nominal";
 }
 
-/** Build mock telemetry for the full dome. */
-export function buildMockTelemetry(): DomeTelemetry {
-  const rng = makeRng(0xd0_e1);
+/**
+ * Build mock telemetry for the full dome.
+ *
+ * `seed` lets a live-feed simulation advance the PRNG stream deterministically
+ * per tick (still never `Math.random()` — see the file header) instead of
+ * every tick reproducing the exact same snapshot.
+ */
+export function buildMockTelemetry(seed = 0xd0_e1): DomeTelemetry {
+  const rng = makeRng(seed);
   const faceTelemetry: Record<number, FaceTelemetry> = {};
 
   let totalElements = 0;
@@ -118,7 +107,7 @@ export function buildMockTelemetry(): DomeTelemetry {
     const elements = buildFaceElements(face.fceNum, face.elementCount, rng);
     const online = elements.filter((e) => e.health !== "offline" && e.health !== "critical").length;
     const health = worstHealth(elements);
-    const cluster = worstCluster(elements);
+    const cluster = worstClusterSize(elements.map((e) => e.health), face.kind);
 
     const meanGain = elements.reduce((s, e) => s + e.amplitude, 0) / elements.length;
     const phases = elements.map((e) => e.phase);

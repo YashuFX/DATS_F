@@ -6,7 +6,11 @@ which traps have already cost time.
 
 Feature lives in `src/features/dome-monitor/`. Route is `/dashboard`.
 
-Last updated: 2026-08-26. Phase 1 complete and validated.
+Last updated: 2026-08-27. Phase 1 complete and validated. Phase 2 complete.
+Phases 3 and 4 substantially complete (see per-phase notes in §10 for what's
+still deferred). Phase 5 has one item pulled forward (in-scene fault tags);
+Phase 6 has started (cluster + readiness unit tests, an ARIA live region) but
+is not a full pass.
 
 ---
 
@@ -196,19 +200,33 @@ src/features/dome-monitor/
 ├── lib/
 │   ├── truncatedIcosahedron.ts           ← vec helpers + fanIndices only
 │   ├── adjacency.ts                      ← re-exports ADJACENCY
+│   ├── clustering.ts                     ← connected-component labelling (Phase 3)
+│   ├── elementAppearance.ts              ← colour+scale priority, one function (Phase 3)
+│   ├── alarms.ts                         ← derives aggregate alarms from telemetry (Phase 4)
+│   ├── readiness.ts                      ← Go/Degraded/No-Go/Unknown verdict (Phase 4)
 │   └── __tests__/
 │       ├── readWorkbook.ts               ← minimal xlsx reader (test only)
-│       └── geometry.test.ts              ← 10 validation tests
+│       ├── geometry.test.ts              ← 10 validation tests
+│       ├── clustering.test.ts            ← 6 tests
+│       └── readiness.test.ts             ← 5 tests
+├── hooks/
+│   ├── useSelectionUrlSync.ts            ← selection ⇄ ?face=&element= (Phase 2)
+│   ├── useDomeKeyboard.ts                ← Esc/Home/N/arrows (Phase 2)
+│   ├── useMockTelemetryFeed.ts           ← ticks the mock every 4s (Phase 4)
+│   └── useNow.ts                         ← shared 1s clock tick
 ├── components/
 │   ├── DomeScreen.tsx                    ← the screen grid
 │   ├── DomeCanvas.tsx                    ← dynamic(ssr:false) WebGL boundary
-│   ├── DomeScene.tsx                     ← 26 × (FaceShell + ElementLayer)
+│   ├── DomeScene.tsx                     ← 26 × (FaceShell + ElementLayer + FaceStatusTexture)
 │   ├── FaceShell.tsx  ElementLayer.tsx
+│   ├── FaceStatusTexture.tsx             ← per-face blotch texture (Phase 3)
+│   ├── AlarmsPanel.tsx                   ← array-level, Acknowledge/Shelve (Phase 4)
 │   ├── DomeNetView.tsx                   ← 2D fallback / companion view
 │   ├── CameraPresets.tsx  MetricLegend.tsx
 │   ├── KpiStrip.tsx  SelectionRail.tsx  DomeShell.tsx  ScreenFallback.tsx
 ├── store/domeStore.ts
 ├── config.ts   types.ts   index.ts
+data-archival/lib/colorRamp.ts            ← OKLab + cyclic phase ramp (shared, Phase 3/T4)
 scripts/
 ├── validate-dome-geometry.ts             ← prints the validation report
 ├── register-test-hooks.mjs               ← Node ESM resolver for extensionless TS
@@ -372,105 +390,179 @@ sharing a page with them inherits that.
 
 ---
 
-## 9. KNOWN ISSUE — fix first thing
+## 9. KNOWN ISSUE — fixed 2026-08-27
 
-**`src/features/dome-monitor/components/DomeCanvas.tsx`** currently has:
-```ts
-const [webGLOk, setWebGLOk] = useState<boolean>(true);
-useEffect(() => { setWebGLOk(detectWebGL()); }, []);
-```
-This is trap **T6** — it reintroduces the dev-server crash. ESLint flags it
-(`react-hooks/set-state-in-effect`) and it is **the one remaining lint error in
-the feature**.
+~~`src/features/dome-monitor/components/DomeCanvas.tsx`~~ — **T6 is fixed.**
+`useState<boolean>(true)` + `useEffect(() => setWebGLOk(detectWebGL()))` is now
+the lazy initialiser `useState<boolean>(detectWebGL)`. `npx eslint src scripts`
+is clean.
 
-**Fix:** replace both lines with `const [webGLOk, setWebGLOk] = useState<boolean>(detectWebGL);`
+Two more traps were fixed in the same pass, both outside this feature:
 
-(It was left in place because it was an edit made outside this work, not a
-deliberate design choice we validated.)
+- **T4** — `array-monitor/components/TileCard.tsx`'s phase cell used a linear
+  `((phase + 180) / 360) * 100` ramp, putting −179° and +179° at opposite ends
+  of the scale. Replaced with `cyclicPhaseColor()` (new:
+  `data-archival/lib/colorRamp.ts`, OKLab, 4 anchors, wraps at ±180° with no
+  seam). The dome's own Phase metric mode uses the same function.
+- **T5** — the dome's `HEALTH_META.nominal` token was `da-success` (green).
+  Fixed to `da-label` (neutral grey) so "healthy" and "selected" (brand teal)
+  never share a hue, and so a 26-face grid doesn't read as "fine" in
+  peripheral vision whether it was looked at or not. `offline` moved off the
+  same grey onto a new `da-offline` token so a missing reading can't be
+  mistaken for a healthy one. (The global `--color-da-gauge` token was *not*
+  touched — `settings/lib/apply.ts` ties it to the brand colour on purpose for
+  `RadialGauge`, unrelated to dome health semantics.)
 
 ---
 
 ## 10. Remaining phases
 
-### PHASE 2 — Selection  ⬜ next
-- Face picking, then element picking via `event.instanceId`
-  (`globalElementId = faceOffset[faceId] + instanceId`)
-- Hover = **identify only** (tooltip ≤3 lines). Click = **commit**.
-- **Selection must never move the camera implicitly.** Camera motion only on
-  explicit action (alarm click, search, `F`, Locate button).
-- Breadcrumb `Dome › Face 18 › u17 v09`, each crumb a camera target.
-- **Selection state lives in URL search params** — reuse the existing
-  `useDrillParams` hook from `features/array-monitor`. Screens using it must sit
-  inside `<Suspense>`.
-- Keyboard nav on real topology (`ADJACENCY` for faces, lattice for elements).
-  **`N` = jump to next non-nominal object** — the single most valuable key.
-- `Esc` steps up one selection level; `Home` resets camera. **Keep them separate.**
-- Build LRU/Tile breadcrumb levels but leave dormant until **B1**.
-- Exit gate: pick latency < 16 ms; a pasted URL restores selection exactly.
+### PHASE 2 — Selection  ✅ complete
+- Face picking (`FaceShell` click) and element picking (`ElementLayer`
+  `event.instanceId`) — done, pre-existing.
+- Hover = identify only: a 3-line `<Html>` tooltip on the face
+  (`FaceShell.tsx`) — Face N · kind / health / availability. Click still
+  commits; hover never does.
+- Selection never moves the camera implicitly — confirmed true throughout;
+  `Home` is the one explicit exception.
+- Breadcrumb is `Dome › Face N · kind › Element idx` (not the `u17 v09`
+  form sketched here — element identity is a flat template index, there's no
+  natural u/v label to show). Dormant `LRU`/`Tile` crumb segments are in
+  place either side of `Face`, struck through, with a tooltip pointing at
+  blocker **B1**.
+- **Selection lives in the URL** (`?face=&element=`) via a new
+  `hooks/useSelectionUrlSync.ts` — **not** a direct reuse of
+  `useDrillParams`, deliberately: that hook's `get`/`set` model fits a flat
+  screen, but the dome's selection is read and written from deep inside the
+  R3F scene graph (`FaceShell`/`ElementLayer`, several components below the
+  dynamic `Canvas` boundary), where prop-drilling a setter down through every
+  mesh is worse than the zustand store it already had. The new hook
+  hydrates the store from the URL once on mount and mirrors every store
+  change back into it, using the same `next/navigation` primitives
+  `useDrillParams` uses internally. Verified: reload with `?face=14` in the
+  URL restores the exact selection.
+- Keyboard nav (`hooks/useDomeKeyboard.ts`): `N` cascades element → face →
+  whole-dome search for the next non-nominal object (wraps); `Esc` steps up
+  one level; `Home` resets the camera via the same handler `FIT` uses — kept
+  strictly separate from `Esc`. Arrow keys step to the geometrically-nearest
+  face neighbour (by real measured azimuth, via `ADJACENCY`) or nearest
+  lattice neighbour in a direction (by real template (u, v), not a
+  fabricated row/col grid).
+- Not done: formal pick-latency measurement (< 16 ms). The click handlers
+  are synchronous state updates with no obvious cost, but this wasn't
+  profiled.
 
-### PHASE 3 — Health visualisation  ⬜
-- **The dome is neutral grey until something is wrong.** Colour means deviation.
-  **Do not use green for healthy** — it destroys peripheral-vision alarm detection.
-- Four discrete states at overview + a **redundant non-colour cue** (hatch, badge,
-  or word) so the display works in greyscale. Verify by screenshotting to grey.
-- Continuous heat scales only at face/element level, in an explicitly labelled
-  analysis mode with a legend. **Never mix a heat scale and alarm colours in one
-  render** — put it on a mode selector (`States | Gain | Phase | Temp`).
-- Element colour priority: fault overrides everything (full opacity, 1.35× point
-  size — a fault must be findable by size as well as hue) → offline muted →
-  metric ramp. Ramps interpolate in **OKLab, not sRGB**.
-- Per-face status **texture** for sub-face granularity — a cluster shows as a
-  blotch, scattered failures as faint noise. Do **not** draw 7 557 individual
-  coloured points at overview.
-- **Connected-component labelling** over failed elements per face → worst-cluster
-  KPI (see §2).
-- Ship the **2D unfolded net view** here, co-equal with the 3D — the dome can only
-  ever show about half its faces. Use a fixed hand-tuned layout that never
-  changes between releases (operators build spatial memory). No unfolding
-  animation.
-- Semantic zoom + horizon culling.
-- Exit gate: greyscale screenshot fully readable; a single failure findable by
-  keyboard alone.
+### PHASE 3 — Health visualisation  🟡 substantially complete
+- Dome stays neutral grey until something is wrong — the 3D shell (`FACE_COLOURS`
+  in `config.ts`) already did; the 2D UI (chips, legend, net view dots) is now
+  fixed too (§9, trap T5).
+- Redundant non-colour cue shipped as **both** a word/icon badge (in-scene
+  "FAULT · F5" leader-line tags, capped at 4, worst clusters win the cap —
+  `FaceShell.tsx`) and size (a faulted element renders at 1.35× point size,
+  not just a different hue — `lib/elementAppearance.ts`). Not done: an actual
+  greyscale-screenshot pass to verify it.
+- Metric-mode ramps are real: `Gain` and `Temp` are OKLab linear ramps,
+  `Phase` is the cyclic 4-anchor map (§9, T4), all in `lib/colorRamp.ts` +
+  `lib/elementAppearance.ts`. Fault (critical) overrides every ramp; offline
+  renders muted and undersized. One shared function
+  (`elementAppearance`) enforces that priority so `states` and the three
+  analysis modes can't drift apart.
+- **Per-face status texture** — `FaceStatusTexture.tsx` rasterises a soft
+  blotch per non-nominal element onto a small canvas, in the face's own
+  measured (u, v) frame (derived from `faceBasis()` + the same
+  `getFaceElements()` positions the dots use, not a re-derived transform —
+  guaranteed to agree with where the dots actually are). Shown only past
+  `ELEMENT_VISIBILITY_DISTANCE`; the 7 557-dot layer hides at the same
+  threshold (**semantic zoom** — camera distance is now tracked in
+  `domeStore.cameraDistance`, updated from `OrbitControls`' `change` event).
+  Horizon culling (the other half of this bullet) is **not** implemented.
+- **Connected-component labelling is real**, not the array-index
+  approximation the mock used to use: `lib/clustering.ts` builds element
+  adjacency from actual lattice distance (self-calibrated per face kind, not
+  a hardcoded pitch) and does a proper flood fill. 6 unit tests in
+  `lib/__tests__/clustering.test.ts`, including one that hand-verifies two
+  template indices are really one lattice step apart before using them as a
+  fixture. `telemetry.mock.ts` now calls it instead of counting consecutive
+  array indices.
+- 2D net view — pre-existing, unchanged, already co-equal with 3D.
+- Exit gate not verified: no greyscale-screenshot check was run (the redundant
+  cues above make it *likely* to pass, but "likely" isn't "verified").
 
-### PHASE 4 — Telemetry  ⬜ (needs B2)
-- Vanilla-store transport (see §4). Mock → live behind one interface.
-- **Staleness is the one safety-critical requirement.** An operator must never
-  read stale data as healthy:
-  - global data-age indicator always visible
-  - per-object no-data is a **distinct visual state**, never nominal grey
-  - `NO_DATA` excluded from the availability numerator **and** flagged separately
-  - values freeze with timestamp; sparklines draw a **visible gap**, never
-    interpolate through an outage
-  - a stale readiness verdict is `UNKNOWN`, never `GO`
-- **Alarm on aggregates, not elements.** 7 557 alarmable elements is an
-  alarm-flood machine — one PSU drop could raise 374 alarms in a second.
-  Elements log *events*; alarms fire on face/cluster metrics. Show suppression
-  counts visibly, never silently.
-- Acknowledge = "I have seen it", **not** "it is fixed" — must not clear or hide
-  the alarm. Shelve requires a mandatory expiry.
-- Readiness verdict (Go / Degraded / No-Go) against the **B3** floor, naming the
-  driving constraint.
-- Exit gate: 7 557 simultaneous colour changes at 10 Hz stay under 16 ms/frame.
+### PHASE 4 — Telemetry  🟡 substantially complete (still needs real B2)
+- Live feed simulated: `hooks/useMockTelemetryFeed.ts` ticks every 4 s,
+  advancing the mock's seed (fault *locations* stay put between ticks —
+  index-based, not rng-based — the way a real intermittent fault would;
+  severity and background noise drift). This is what makes the rest of this
+  phase demonstrable end to end rather than against one static snapshot. A
+  real feed still needs **B2** (the telemetry contract) before this file
+  gets swapped for a socket/poll.
+- Staleness, scoped to **dome level**, not per-element: `lib/readiness.ts`'s
+  `STALE_THRESHOLD_MS` (3 missed ticks) forces the verdict to `UNKNOWN`, and
+  `DomeShell`'s new `DataAgeIndicator` is always visible in the header,
+  ticking every second. **Deliberately not implemented: per-element
+  `NO_DATA`.** The confirmed hierarchy has no per-element telemetry contract
+  yet (B2), so a per-element stale/no-data state would have no real trigger
+  to hang off — it would be invented, which §3 B1 explicitly warns against
+  doing for the hierarchy and the same logic applies here. Revisit once B2
+  defines what "this element's data is missing" actually looks like.
+  Sparklines (the other half of this bullet — visible-gap-never-interpolate)
+  don't exist anywhere in this feature yet; not built.
+- **Alarms on aggregates only** — `lib/alarms.ts` derives alarms from
+  face-level health/VSWR/temp, never per-element. `AlarmsPanel.tsx`
+  (array-level, right rail): Acknowledge dims an alarm but does not remove
+  it; Shelve suppresses it from the active list for a mandatory 15 minutes
+  (no permanent dismiss), and the shelved count stays visible in the panel
+  header the whole time.
+- **Readiness verdict** — `lib/readiness.ts`, `Go / Degraded / No-Go /
+  Unknown`, shown in the header (`ReadinessBadge`). Always names the
+  driving constraint (e.g. "VSWR 1.62 on Face 9 exceeds 1.5"). Judged
+  against `THRESHOLDS` in `config.ts`, which are **still DEMO placeholders**
+  — the real EIRP/G-T/peak-sidelobe floor is blocker **B3**, still open.
+- Exit gate not verified: no 7 557-colour/10 Hz frame-time benchmark was run
+  (the mock ticks at 4 s, not 10 Hz, and colour writes only happen on
+  telemetry/selection/metric-mode change per face, not every frame — likely
+  fine, not measured).
 
-### PHASE 5 — Polish & performance  ⬜
-- Motion: hover 100 ms, selection 160 ms, camera 440 ms. Camera transitions
-  **slerped on the orbit sphere** — never lerp position (paths through the dome
-  interior). All interruptible.
-- **No auto-rotate, ever. No bloom, glow, HDR, lens flare, skybox.**
-  Tone mapping stays `NoToneMapping` so scene colours match the badge colours.
-- In-scene fault tags with leader lines for **critical faces only**, capped at 4.
-- Labels as **HTML overlay, not SDF text** — inherits fonts/tokens, stays crisp.
-- `PerformanceMonitor` adaptive quality, reduced-motion paths, light/dark parity.
-- Verify at 1366×768 **and** 2560. Give the dome its own `:has()` root clamp with
-  a **14 px floor** — the archival clamp resolves to 13.99 px at 1366, putting
-  `text-3xs` at 7.87 px which is unreadable for a shift.
-- Exit gate: Spector.js capture archived as an acceptance artefact.
+### PHASE 5 — Polish & performance  ⬜ (one item pulled forward)
+- ✅ Done early, alongside Phase 3: in-scene fault tags with leader lines for
+  critical faces only, capped at 4 (`FaceShell.tsx`), and as HTML overlay
+  (`<Html>`), not SDF text.
+- ✅ Already true, unchanged: no auto-rotate, no bloom/glow/HDR/lens
+  flare/skybox, `NoToneMapping`.
+- Still not done: hover/selection/camera motion-timing audit (camera preset
+  transitions lerp `camera.position` between two points on request, not a
+  true orbit-sphere slerp — pre-existing behaviour, not touched);
+  `PerformanceMonitor` adaptive quality; reduced-motion audit; verification
+  at 1366×768 and 2560; the dome's own `:has()` clamp with a 14 px floor;
+  Spector.js capture.
 
-### PHASE 6 — Testing  ⬜
-- Geometry regression tests already exist — **keep them green**.
-- Add: cluster-labelling unit tests; keyboard-only pass; screen-reader pass
-  (canvas selection state mirrored into an ARIA live region); greyscale audit.
-- Verify both `next build` and `next build --webpack`.
+### PHASE 6 — Testing  🟡 started
+- ✅ Geometry regression tests still green (10/10, unaffected).
+- ✅ Added: 6 cluster-labelling unit tests (`lib/__tests__/clustering.test.ts`)
+  and 5 readiness-verdict unit tests (`lib/__tests__/readiness.test.ts`, not
+  originally scoped here but cheap and directly guards the one
+  safety-critical rule in §Phase 4 — stale telemetry must never verdict GO).
+  21/21 tests pass; `npm run validate:geometry` still reports max XYZ error
+  1.255e-9 m, unaffected.
+- ✅ Started: an ARIA live region (`role="status" aria-live="polite"` in
+  `DomeScreen.tsx`) mirrors the current selection as a sentence — not the
+  full screen-reader pass this bullet asks for (no audit of the rest of the
+  screen's semantics was done).
+- Not done: a real keyboard-only pass (nav was implemented and exercised via
+  an automated driver — see below — but not audited for completeness),
+  greyscale audit, `next build --webpack` (only the default Turbopack build
+  was verified).
+- **Manually verified working end-to-end**, 2026-08-27, via a headless
+  Chrome + Playwright driver (`chromium-cli`/`playwright` aren't installed in
+  this environment, so a throwaway driver was written and installed into the
+  scratchpad, not the repo): registered a test account, loaded `/dashboard`,
+  clicked a face (hover tooltip + click-to-select + URL update all fired),
+  reloaded with `?face=14` in the URL and confirmed the exact selection
+  restored, exercised `Esc`/`N`/`Home`/camera presets/2D-3D toggle, cycled
+  all four metric modes (visibly different colouring per mode, phase ramp
+  confirmed to wrap smoothly across face boundaries), and used the Alarms
+  panel's Acknowledge and Shelve controls (shelved count updated visibly).
+  Zero browser console/page errors across the whole pass.
 
 ---
 
@@ -482,7 +574,11 @@ deliberate design choice we validated.)
   get most of the value from a 26-cell grid with no 3D at all.
 - Viewport is **borderless**, separated from the board by a value step, not a
   hairline. That is what makes the dome read as hero.
-- Face table survives as a **collapsible bottom deck** (key `T`), closed by default.
+- Face table survives as a **collapsible bottom deck** (key `T`), closed by
+  default. **Not built yet** — the array-level rail now has a Face Summary
+  grid and an Alarms panel instead (§10 Phase 4), which cover the same
+  "scan all 26 faces" and "what's wrong right now" needs; revisit whether a
+  separate bottom deck still earns its keep before building it.
 - Structural dimensions match the existing shells: header `4rem`, module rail
   `13.75rem`, detail rail `18.5rem`, footer `2.75rem`, gutter `0.75rem`,
   screen padding `0.875rem`.
@@ -501,8 +597,8 @@ deliberate design choice we validated.)
 | Dome geometry | ✅ **REAL** — reconstructed from `Must_cord.xlsx` |
 | Face / element addressing | ✅ **REAL** — FceNum + lattice index |
 | LRU / Tile / Sub-array map | ❌ **ABSENT** — see B1 |
-| Element health, temp, power, RF | ⚠️ **MOCK** — `telemetry.mock.ts` |
-| Alarms and thresholds | ⚠️ **MOCK** — placeholder values |
+| Element health, temp, power, RF | ⚠️ **MOCK** — `telemetry.mock.ts`, now ticking every 4 s via `useMockTelemetryFeed` (still `*.mock.ts`, still seeded, still not real) |
+| Alarms and thresholds | ⚠️ **MOCK** — placeholder values (`THRESHOLDS` in `config.ts`, pending real figures from **B3**) |
 
 Mock modules use a fixed-seed Mulberry32 PRNG (never `Math.random()`, so SSR and
 hydration match), are named `*.mock.ts`, and the UI must carry a persistent
@@ -538,10 +634,24 @@ concepts, layout, component tree, risks):
 
 ```bash
 npm install
-npm run test:geometry      # expect 10 pass
+npm run test:geometry      # expect 21 pass (10 geometry + 6 clustering + 5 readiness)
 npm run validate:geometry  # expect max XYZ error 1.255e-9 m
 npm run dev                # → /dashboard
 ```
 
-Then: fix §9, and start Phase 2. Chase blocker **B1** in parallel — it gates the
-drill-down depth, not Phase 2 itself.
+Phases 2–4 are substantially built (see §10 for exactly what's done vs.
+deferred in each). What's left, roughly in order of value:
+
+1. **Chase B1/B2/B3** — still the real gate. B1 unlocks the LRU/Tile
+   breadcrumb levels (dormant, not invented); B2 unlocks real per-element
+   telemetry (today's mock ticks live but is still fabricated); B3 unlocks a
+   real readiness threshold (today's `THRESHOLDS` are placeholders).
+2. **Phase 5 polish** — mostly untouched: `PerformanceMonitor` adaptive
+   quality, the 1366×768/2560 responsive pass + dome's own `:has()` clamp,
+   reduced-motion audit, Spector.js capture. One item (fault-tag leader
+   lines) is already done, pulled forward with Phase 3.
+3. **Phase 6 finishing** — a real keyboard-only pass and greyscale audit (the
+   redundant cues are in place; neither was formally verified), a fuller
+   screen-reader pass beyond the one ARIA live region, `next build --webpack`.
+4. Decide whether the bottom-deck face table (§11) still earns its place next
+   to the Alarms panel + Face Summary grid before building it.

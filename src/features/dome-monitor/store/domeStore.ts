@@ -9,6 +9,11 @@
 import { create } from "zustand";
 import type { DomeTelemetry, MetricMode, SelectionRef } from "../types";
 import { MOCK_TELEMETRY } from "../data/telemetry.mock";
+import {
+  CAMERA_DEFAULT_DISTANCE,
+  ELEMENT_VISIBILITY_SHOW_DISTANCE,
+  ELEMENT_VISIBILITY_HIDE_DISTANCE,
+} from "../config";
 
 export interface DomeState {
   /** Current selection. */
@@ -21,6 +26,38 @@ export interface DomeState {
   telemetry: DomeTelemetry;
   /** Monotonic counter — bumped on every telemetry update. */
   revision: number;
+  /** Distance from the dome centre to the camera (metres). */
+  cameraDistance: number;
+  /**
+   * Semantic zoom — whether faces show 7 557 individual element dots
+   * (true) or an aggregate status texture (false). Computed here, in one
+   * place, with hysteresis (see config.ts), rather than in each of
+   * ElementLayer/FaceStatusTexture separately: two components independently
+   * thresholding the same distance risks them disagreeing for a frame, and
+   * a single shared threshold would need re-deriving the same band twice.
+   */
+  elementsVisible: boolean;
+  /**
+   * Acknowledge/shelve state per alarm id. Alarms themselves are derived
+   * fresh from telemetry every render (see AlarmsPanel) rather than stored —
+   * only the operator's response to one needs to persist. Acknowledging
+   * means "I have seen it", never "it is fixed": it does not remove the
+   * alarm. Shelving suppresses it from the active list until `shelvedUntil`,
+   * a mandatory expiry — there is no permanent dismiss.
+   */
+  alarmAcks: Record<string, { acknowledged: boolean; shelvedUntil: number | null }>;
+  /**
+   * Whether the detail panel is showing the Alarms list rather than a face
+   * selection. Lives here (not local component state) because the header's
+   * "N faces flagged" pill (DomeShell) and the panel itself (DomeScreen) are
+   * different React subtrees that both need to read/write it. Not
+   * URL-synced — it isn't a geometric selection, it's transient UI state.
+   */
+  alarmsOpen: boolean;
+  /** Bumped by requestReframe() so "Zoom to Face" re-triggers the camera lerp
+   *  even when the selection itself hasn't changed (the user drifted away
+   *  with the orbit controls and wants to snap back). */
+  reframeNonce: number;
 
   /* ---- actions ---- */
   selectFace: (fceNum: number) => void;
@@ -29,6 +66,11 @@ export interface DomeState {
   setHover: (fceNum: number | null) => void;
   setMetricMode: (mode: MetricMode) => void;
   updateTelemetry: (t: DomeTelemetry) => void;
+  setCameraDistance: (d: number) => void;
+  acknowledgeAlarm: (id: string) => void;
+  shelveAlarm: (id: string, durationMs: number) => void;
+  setAlarmsOpen: (open: boolean) => void;
+  requestReframe: () => void;
 }
 
 export const useDomeStore = create<DomeState>((set) => ({
@@ -37,15 +79,20 @@ export const useDomeStore = create<DomeState>((set) => ({
   metricMode: "states",
   telemetry: MOCK_TELEMETRY,
   revision: 0,
+  cameraDistance: CAMERA_DEFAULT_DISTANCE,
+  elementsVisible: CAMERA_DEFAULT_DISTANCE <= ELEMENT_VISIBILITY_SHOW_DISTANCE,
+  alarmAcks: {},
+  alarmsOpen: false,
+  reframeNonce: 0,
 
   selectFace: (fceNum) =>
-    set({ selection: { level: "face", faceNum: fceNum } }),
+    set({ selection: { level: "face", faceNum: fceNum }, alarmsOpen: false }),
 
   selectElement: (fceNum, elementIdx) =>
-    set({ selection: { level: "element", faceNum: fceNum, elementIdx } }),
+    set({ selection: { level: "element", faceNum: fceNum, elementIdx }, alarmsOpen: false }),
 
   clearSelection: () =>
-    set({ selection: { level: "array" } }),
+    set({ selection: { level: "array" }, alarmsOpen: false }),
 
   setHover: (fceNum) =>
     set({ hoveredFace: fceNum }),
@@ -55,4 +102,32 @@ export const useDomeStore = create<DomeState>((set) => ({
 
   updateTelemetry: (t) =>
     set((state) => ({ telemetry: t, revision: state.revision + 1 })),
+
+  setCameraDistance: (d) =>
+    set((state) => {
+      let elementsVisible = state.elementsVisible;
+      if (elementsVisible && d >= ELEMENT_VISIBILITY_HIDE_DISTANCE) elementsVisible = false;
+      else if (!elementsVisible && d <= ELEMENT_VISIBILITY_SHOW_DISTANCE) elementsVisible = true;
+      return { cameraDistance: d, elementsVisible };
+    }),
+
+  acknowledgeAlarm: (id) =>
+    set((state) => ({
+      alarmAcks: {
+        ...state.alarmAcks,
+        [id]: { acknowledged: true, shelvedUntil: state.alarmAcks[id]?.shelvedUntil ?? null },
+      },
+    })),
+
+  shelveAlarm: (id, durationMs) =>
+    set((state) => ({
+      alarmAcks: {
+        ...state.alarmAcks,
+        [id]: { acknowledged: true, shelvedUntil: Date.now() + durationMs },
+      },
+    })),
+
+  setAlarmsOpen: (open) => set({ alarmsOpen: open }),
+
+  requestReframe: () => set((state) => ({ reframeNonce: state.reframeNonce + 1 })),
 }));

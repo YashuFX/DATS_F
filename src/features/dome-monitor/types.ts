@@ -15,14 +15,24 @@
 
 export type HealthId = "nominal" | "degraded" | "critical" | "offline";
 
+/**
+ * Colour tokens for the four health states.
+ *
+ * `nominal` is deliberately NOT `da-success` (green) — the dome is neutral
+ * grey until something is wrong, and colour means deviation. Leading with
+ * green for "fine" destroys peripheral-vision alarm detection across a
+ * 26-face grid: a wash of green reads as "healthy" whether you looked or not.
+ * `offline` gets its own token rather than reusing the nominal grey — a
+ * missing reading must never be visually mistaken for a healthy one.
+ */
 export const HEALTH_META: Record<
   HealthId,
   { label: string; token: string; priority: number }
 > = {
-  nominal:  { label: "Nominal",  token: "da-success", priority: 0 },
+  nominal:  { label: "Nominal",  token: "da-label",   priority: 0 },
   degraded: { label: "Degraded", token: "da-warn",    priority: 1 },
   critical: { label: "Critical", token: "da-danger",  priority: 2 },
-  offline:  { label: "Offline",  token: "da-label",   priority: 3 },
+  offline:  { label: "Offline",  token: "da-offline", priority: 3 },
 };
 
 /* ---------- geometry ---------- */
