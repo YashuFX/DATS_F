@@ -91,7 +91,7 @@ export function DomeNetView() {
               Cluster: {ft.worstClusterSize} el
             </span>
             <span className="text-3xs text-da-muted">
-              {ft.phaseRmsDeg.toFixed(1)}° RMS
+              {ft.phaseErrorRmsDeg.toFixed(1)}° err
             </span>
           </div>
         )}

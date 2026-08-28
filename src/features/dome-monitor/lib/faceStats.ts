@@ -9,8 +9,8 @@ import { PRESENT_FACES } from "../data/geometry";
 import type { DomeTelemetry, FaceTelemetry } from "../types";
 
 export interface DomeAverages {
-  meanGainDb: number;
-  phaseRmsDeg: number;
+  meanExcitationDb: number;
+  phaseErrorRmsDeg: number;
   tempC: number;
 }
 
@@ -19,8 +19,8 @@ export function domeAverages(telemetry: DomeTelemetry): DomeAverages {
   const faces = PRESENT_FACES.map((f) => telemetry.faces[f.fceNum]).filter((f): f is FaceTelemetry => !!f);
   const n = faces.length || 1;
   return {
-    meanGainDb: faces.reduce((s, f) => s + f.meanGainDb, 0) / n,
-    phaseRmsDeg: faces.reduce((s, f) => s + f.phaseRmsDeg, 0) / n,
+    meanExcitationDb: faces.reduce((s, f) => s + f.meanExcitationDb, 0) / n,
+    phaseErrorRmsDeg: faces.reduce((s, f) => s + f.phaseErrorRmsDeg, 0) / n,
     tempC: faces.reduce((s, f) => s + f.tempC, 0) / n,
   };
 }

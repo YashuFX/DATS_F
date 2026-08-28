@@ -4,6 +4,7 @@ import { Component, useState, useEffect, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { DomeScene } from "./DomeScene";
+import { CAMERA_BASE_FOV } from "../config";
 import { DomeNetView } from "./DomeNetView";
 import type { CameraPreset } from "../types";
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -149,7 +150,10 @@ export function DomeCanvas({
             failIfMajorPerformanceCaveat: false,
           }}
           camera={{
-            fov: 50,
+            // Authored value only — DomeScene re-derives fov every time the
+            // canvas or the detail panel resizes, so the dome stays inside
+            // the strip the panel is not covering (lib/cameraFraming.fitFov).
+            fov: CAMERA_BASE_FOV,
             near: 0.1,
             far: 100,
             position: [6, 6, 4],

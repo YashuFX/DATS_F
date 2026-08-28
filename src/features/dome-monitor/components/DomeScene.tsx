@@ -5,12 +5,12 @@ import { useThree } from "@react-three/fiber";
 import { useRef, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { ALL_FACES, PRESENT_FACES, FACE_MAP } from "../data/geometry";
-import { CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE, CAMERA_TRANSITION_MS, VIEWPORT_SHIFT_RATIO } from "../config";
+import { CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE, CAMERA_TRANSITION_MS } from "../config";
 import { useDomeStore } from "../store/domeStore";
 import { FaceShell } from "./FaceShell";
 import { ElementLayer } from "./ElementLayer";
 import { FaceStatusTexture } from "./FaceStatusTexture";
-import { DOME_CENTER_TARGET, centeredFrame, faceFrame } from "../lib/cameraFraming";
+import { DOME_CENTER_TARGET, centeredFrame, faceFrame, viewportFraming } from "../lib/cameraFraming";
 import { useDragThreshold } from "../hooks/useDragThreshold";
 import type { CameraPreset } from "../types";
 
@@ -43,6 +43,8 @@ export function DomeScene({
   const telemetry = useDomeStore((s) => s.telemetry);
   const selection = useDomeStore((s) => s.selection);
   const reframeNonce = useDomeStore((s) => s.reframeNonce);
+  const alarmsOpen = useDomeStore((s) => s.alarmsOpen);
+  const panelWidth = useDomeStore((s) => s.panelWidth);
   const emptySpaceDragGuard = useDragThreshold();
 
   // The camera always targets the dome's true centre, selected or not — the
@@ -147,12 +149,27 @@ export function DomeScene({
     return () => controls.removeEventListener("change", reportDistance);
   }, [camera]);
 
-  // Left-shift the RENDERED frame while a face/element is selected, via a
-  // projection-level view offset — not by moving the orbit target (see the
-  // long comment on `activeFrame` above and lib/cameraFraming.ts). Because
-  // this never touches camera.position/target, free 360° orbiting keeps
-  // working exactly the same whether or not something is selected; the crop
-  // just re-centres on whatever the camera is currently pointed at.
+  // Frame the dome inside the part of the canvas the operator can actually
+  // see, and left-shift the RENDERED frame out from under the detail panel —
+  // via projection-level changes only, never by moving the orbit target (see
+  // the long comment on `activeFrame` above and lib/cameraFraming.ts). Because
+  // this never touches camera.position/target, free 360 degree orbiting keeps
+  // working exactly the same whether or not the panel is open; the crop just
+  // re-centres on whatever the camera is currently pointed at.
+  //
+  // The shift is derived from the panel's MEASURED width, not from a fixed
+  // fraction of canvas width. An earlier version used the latter and drifted:
+  // PANEL_WIDTH_CSS resolves against a root font-size of
+  // `min(1.1111vw, 1.8223vh)` (globals.css), so on any viewport taller than
+  // ~16:10 the panel's share of the card grows with HEIGHT while the canvas
+  // width — and therefore the fixed shift — does not. Entering fullscreen at
+  // 1920x1080 took the panel from 38% of the card to 46% and left the dome
+  // ~170 px too far right, touching the panel edge; the same error was
+  // present windowed, just with enough slack to hide it.
+  //
+  // fov and the offset are set in ONE effect on purpose: `setViewOffset`
+  // rebuilds the projection matrix as its last act, so a separate fov effect
+  // would race it and land a frame late.
   //
   // Trap: `setViewOffset(fullWidth, fullHeight, ...)` sets `camera.aspect =
   // fullWidth / fullHeight` as a side effect (three.js source, first line of
@@ -160,35 +177,62 @@ export function DomeScene({
   // camera's own aspect property with the WIDENED sensor's ratio.
   // `clearViewOffset()` does NOT undo this (it only flips `view.enabled` and
   // recomputes the projection matrix from whatever `.aspect` currently is),
-  // so without resetting `.aspect` explicitly, the dome renders squeezed
-  // from the moment a face is first selected onward — including after
-  // deselecting, since nothing else in R3F re-derives `.aspect` unless the
+  // so `.aspect` is reassigned from the true canvas ratio on every run below
+  // rather than only on the closing one. Without that, the dome renders
+  // squeezed from the moment the panel first opens onward — including after
+  // it closes, since nothing else in R3F re-derives `.aspect` unless the
   // canvas itself actually resizes.
   useEffect(() => {
     const perspectiveCamera = camera as THREE.PerspectiveCamera;
     if (typeof perspectiveCamera.setViewOffset !== "function") return;
     if (size.width === 0 || size.height === 0) return;
 
-    const trueAspect = size.width / size.height;
-    const panelOpen = selection.level !== "array";
+    // Alarms count as an open panel: it is the same overlay at the same
+    // width, so it hides the dome exactly as much as a face selection does.
+    const panelOpen = selection.level !== "array" || alarmsOpen;
 
-    if (!panelOpen) {
-      perspectiveCamera.aspect = trueAspect;
+    const { fov, obstructedPx } = viewportFraming(
+      size.width,
+      size.height,
+      panelWidth,
+      activeFrame.distance,
+      panelOpen,
+    );
+
+    // Mutating the camera IS the API here — three.js has no immutable path
+    // for fov/aspect/view-offset, and R3F hands out the live camera object
+    // precisely so scenes can drive it. (Pre-existing on this effect; the
+    // rule cannot tell an owned imperative handle from shared state.)
+    /* eslint-disable react-hooks/immutability */
+    perspectiveCamera.fov = fov;
+    perspectiveCamera.aspect = size.width / size.height;
+
+    if (obstructedPx > 0) {
+      // Render as if the sensor were `obstructedPx` wider than the canvas and
+      // the canvas were aligned to its right edge. World origin then lands at
+      // `fullWidth / 2 - offsetX` px from the left — i.e. the centre of the
+      // unobstructed strip — while the visible frustum keeps the canvas's own
+      // aspect and scale. Nothing here scales the dome; it only moves.
+      const fullWidth = size.width + obstructedPx;
+      perspectiveCamera.setViewOffset(fullWidth, size.height, obstructedPx, 0, size.width, size.height);
+    } else {
       perspectiveCamera.clearViewOffset();
-      invalidate();
-      return;
     }
 
-    const fullWidth = size.width * VIEWPORT_SHIFT_RATIO;
-    const offsetX = fullWidth - size.width; // align the real canvas to the right edge of the widened sensor
-    perspectiveCamera.setViewOffset(fullWidth, size.height, offsetX, 0, size.width, size.height);
-    invalidate();
+    perspectiveCamera.updateProjectionMatrix();
+    /* eslint-enable react-hooks/immutability */
 
-    return () => {
-      perspectiveCamera.aspect = trueAspect;
-      perspectiveCamera.clearViewOffset();
-    };
-  }, [selection.level, size.width, size.height, camera, invalidate]);
+    invalidate();
+  }, [
+    selection.level,
+    alarmsOpen,
+    panelWidth,
+    activeFrame.distance,
+    size.width,
+    size.height,
+    camera,
+    invalidate,
+  ]);
 
   return (
     <>

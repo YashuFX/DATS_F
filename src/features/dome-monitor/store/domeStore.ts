@@ -54,6 +54,21 @@ export interface DomeState {
    * URL-synced — it isn't a geometric selection, it's transient UI state.
    */
   alarmsOpen: boolean;
+  /**
+   * Measured width, in CSS px, of the detail panel overlay — 0 until it has
+   * been measured once.
+   *
+   * The panel overlays the canvas rather than sitting beside it, so opening
+   * it changes nothing the 3D scene can observe: R3F still reports the full
+   * canvas size while up to ~46% of it sits under the panel. This is how the
+   * scene learns how much of its own viewport is covered, so it can centre
+   * the dome in what is left (DomeScene -> lib/cameraFraming.viewportFraming).
+   *
+   * Measured, never recomputed: PANEL_WIDTH_CSS's clamp() resolves against a
+   * viewport-derived root font-size, so a JS copy of that rule would be a
+   * second source of truth — see the comment on PANEL_WIDTH_CSS.
+   */
+  panelWidth: number;
   /** Bumped by requestReframe() so "Zoom to Face" re-triggers the camera lerp
    *  even when the selection itself hasn't changed (the user drifted away
    *  with the orbit controls and wants to snap back). */
@@ -70,6 +85,7 @@ export interface DomeState {
   acknowledgeAlarm: (id: string) => void;
   shelveAlarm: (id: string, durationMs: number) => void;
   setAlarmsOpen: (open: boolean) => void;
+  setPanelWidth: (width: number) => void;
   requestReframe: () => void;
 }
 
@@ -83,6 +99,7 @@ export const useDomeStore = create<DomeState>((set) => ({
   elementsVisible: CAMERA_DEFAULT_DISTANCE <= ELEMENT_VISIBILITY_SHOW_DISTANCE,
   alarmAcks: {},
   alarmsOpen: false,
+  panelWidth: 0,
   reframeNonce: 0,
 
   selectFace: (fceNum) =>
@@ -128,6 +145,12 @@ export const useDomeStore = create<DomeState>((set) => ({
     })),
 
   setAlarmsOpen: (open) => set({ alarmsOpen: open }),
+
+  // Bail on an unchanged width: a ResizeObserver fires on every layout pass
+  // that touches the panel, and each accepted write re-runs the scene's
+  // projection effect.
+  setPanelWidth: (width) =>
+    set((state) => (state.panelWidth === width ? state : { panelWidth: width })),
 
   requestReframe: () => set((state) => ({ reframeNonce: state.reframeNonce + 1 })),
 }));

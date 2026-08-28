@@ -21,8 +21,8 @@ function baseFaceTelemetry(fceNum: number, total: number): FaceTelemetry {
     online: total,
     total,
     availabilityPercent: 100,
-    meanGainDb: 0,
-    phaseRmsDeg: 5,
+    meanExcitationDb: 0,
+    phaseErrorRmsDeg: 5,
     vswr: 1.1,
     tempC: 35,
     worstClusterSize: 0,
@@ -46,6 +46,12 @@ function buildTelemetry(overrides: Partial<Record<number, Partial<FaceTelemetry>
       availabilityPercent: 100,
       worstClusterSize: 0,
       worstClusterFace: 0,
+      peakVswr: 1.1,
+      peakVswrFace: PRESENT_FACES[0].fceNum,
+      peakTempC: 35,
+      peakTempFace: PRESENT_FACES[0].fceNum,
+      peakPhaseErrorDeg: 5,
+      peakPhaseErrorFace: PRESENT_FACES[0].fceNum,
     },
   };
 }

@@ -49,6 +49,22 @@ export function deriveAlarms(telemetry: DomeTelemetry): Alarm[] {
       });
     }
 
+    // Calibration drift. Nothing used to alarm on this at dome level even
+    // though THRESHOLDS.phaseJitterDeg existed — so an aperture could slide
+    // out of calibration with every element still reporting "nominal" and
+    // no indication anywhere on the screen. Phase error is the dominant
+    // term in Ruze gain loss (exp(-sigma^2)) and it raises the sidelobe
+    // floor, which for a ground station is the difference between closing
+    // the link and interfering with the adjacent satellite.
+    if (ft.phaseErrorRmsDeg > THRESHOLDS.phaseJitterDeg) {
+      alarms.push({
+        id: `face-${face.fceNum}-phase`,
+        faceNum: face.fceNum,
+        severity: ft.phaseErrorRmsDeg > THRESHOLDS.phaseJitterDeg * 2 ? "critical" : "degraded",
+        message: `Face ${face.fceNum} phase error ${ft.phaseErrorRmsDeg.toFixed(1)}° RMS exceeds ${THRESHOLDS.phaseJitterDeg}°`,
+      });
+    }
+
     if (ft.tempC >= THRESHOLDS.tempWarnC) {
       alarms.push({
         id: `face-${face.fceNum}-temp`,

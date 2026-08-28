@@ -60,6 +60,19 @@ export function computeReadiness(telemetry: DomeTelemetry, now: number): Readine
     return { verdict: "DEGRADED", reason: `Worst cluster ${worstClusterSize} el on Face ${worstClusterFace}` };
   }
 
+  // Calibration, judged before the face-count sweep below: an aperture out
+  // of phase spec is degraded even when every element reports nominal, and
+  // naming the residual is more actionable to an operator than "n faces off
+  // nominal". Ruze: gain loss ~ exp(-sigma^2), so 12 deg RMS is already
+  // ~0.2 dB off peak with a correspondingly raised sidelobe floor.
+  const { peakPhaseErrorDeg, peakPhaseErrorFace } = telemetry.totals;
+  if (peakPhaseErrorDeg > THRESHOLDS.phaseJitterDeg) {
+    return {
+      verdict: "DEGRADED",
+      reason: `Face ${peakPhaseErrorFace} phase error ${peakPhaseErrorDeg.toFixed(1)}° RMS exceeds ${THRESHOLDS.phaseJitterDeg}°`,
+    };
+  }
+
   const degradedFaces = telemetry.totals.facesTotal - telemetry.totals.facesHealthy;
   if (degradedFaces > 0) {
     return { verdict: "DEGRADED", reason: `${degradedFaces} face${degradedFaces > 1 ? "s" : ""} off nominal` };

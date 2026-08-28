@@ -40,22 +40,48 @@ export const ELEMENT_VISIBILITY_HIDE_DISTANCE = 15;
  *  just one face filling the frame) still fits in the left half. */
 export const FACE_FRAME_DISTANCE = 9.5;
 
+/** Vertical FOV the camera is authored at (DomeCanvas creates it with this). */
+export const CAMERA_BASE_FOV = 50;
+
 /**
- * Projection-level left-shift applied via `camera.setViewOffset` while a
- * face is selected (see DomeScene.tsx) — NOT a change to where the camera
- * orbits around (that stays the dome's true centre always, so free rotation
- * never feels "stuck" around an artificial pivot). This is the ratio of a
- * virtual widened frame to the real canvas width: 1.0 = no shift; 1.25 means
- * the camera renders as if its sensor were 25% wider than the canvas, with
- * the real canvas aligned to the right edge of that wider sensor — which
- * pushes the (still dead-centre-targeted) dome toward the left of the
- * visible frame by roughly half that extra width. Tuned by eye.
+ * Widest the fit-guard may open the vertical FOV to when the visible strip
+ * of the viewport is too narrow to hold the dome (see `fitFov` in
+ * lib/cameraFraming.ts). Past ~70 deg the perspective exaggeration starts
+ * reading as fisheye — better a dome that crowds its strip than one that
+ * looks like a different instrument.
  */
-export const VIEWPORT_SHIFT_RATIO = 1.28;
+export const CAMERA_MAX_FIT_FOV = 70;
+
+/**
+ * Bounding radius the fit-guard keeps on screen, in metres. Larger than the
+ * dome's actual silhouette radius (~2.83 m — DOME_CIRCUMRADIUS is the vertex
+ * bound, and the bottom cap is absent) so "fits" means fits with breathing
+ * room, not hugging the edge.
+ */
+export const DOME_FIT_RADIUS = 3.36;
+
+/**
+ * Ceiling on how much of the canvas the detail panel is allowed to count as
+ * obstructed, as a fraction of canvas width. PANEL_WIDTH_CSS is normally at
+ * most 50%, but its `clamp()` floor (24rem) can exceed that on a narrow
+ * card — without this cap the framing would shove the dome off the left
+ * edge chasing a strip barely wider than the panel.
+ */
+export const MAX_OBSTRUCTED_FRACTION = 0.6;
 
 /**
  * Detail panel width — roughly half the viewport, per spec, clamped so it
  * stays readable at 1366px and doesn't sprawl at 2560px+.
+ *
+ * Nothing recomputes this clamp in JS. It resolves against a root font-size
+ * that is itself viewport-derived (`min(1.1111vw, 1.8223vh)`, globals.css),
+ * so on any viewport taller than ~16:10 the panel's share of the card grows
+ * with HEIGHT while the canvas width stays put — 38% of the card windowed
+ * vs 46% in fullscreen at 1920x1080. The 3D framing therefore measures the
+ * rendered panel (DetailPanel -> domeStore.panelWidth) instead of holding a
+ * second copy of this rule that would drift the moment either value is
+ * retuned. An earlier version shifted the dome by a fixed fraction of canvas
+ * width, which is exactly the assumption this comment exists to kill.
  */
 export const PANEL_WIDTH_CSS = "clamp(24rem, 50%, 44rem)";
 

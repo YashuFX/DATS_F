@@ -64,18 +64,40 @@ function buildFaceElements(
     }
 
     const amplitude = Math.min(1, Math.max(0.1, 0.85 + (rng() - 0.5) * 0.15));
-    const phase = Math.round(Math.sin(i * 0.1) * 40 + (rng() - 0.5) * 10);
+
+    // Beam-steering ramp across the face. Large, smooth, and IDENTICAL on a
+    // perfectly calibrated array — this is where the beam is pointed, not a
+    // fault. It is what the 3D "Phase" metric mode colours, because a stuck
+    // element shows up as a break in an otherwise smooth gradient.
+    const commandedPhase = Math.sin(i * 0.1) * 40;
+
+    // Calibration residual on top of it. A healthy T/R module holds a few
+    // degrees; a degraded one drifts; a critical one is typically a stuck or
+    // free-running phase shifter, which lands anywhere in the circle. That
+    // last case is why a boolean alive/dead element model understates impact
+    // (PHASEPLAN B2): a stuck shifter radiates power into the wrong place
+    // rather than simply not radiating.
+    const errorScale = health === "critical" ? 90 : health === "degraded" ? 22 : 3.2;
+    const phaseErrorDeg = (rng() - 0.5) * 2 * errorScale;
+
     const tempC = 35 + rng() * 12;
 
     elements.push({
       health,
       amplitude: Number(amplitude.toFixed(3)),
-      phase,
+      phase: Math.round(wrapPhase(commandedPhase + phaseErrorDeg)),
+      phaseErrorDeg: Number(phaseErrorDeg.toFixed(2)),
       tempC: Number(tempC.toFixed(1)),
     });
   }
 
   return elements;
+}
+
+/** Fold a phase into (-180, +180]. */
+function wrapPhase(deg: number): number {
+  const wrapped = ((deg + 180) % 360 + 360) % 360 - 180;
+  return wrapped;
 }
 
 function worstHealth(elements: ElementTelemetry[]): HealthId {
@@ -102,6 +124,12 @@ export function buildMockTelemetry(seed = 0xd0_e1): DomeTelemetry {
   let totalHealthy = 0;
   let globalWorstCluster = 0;
   let globalWorstFace = 0;
+  let peakVswr = 0;
+  let peakVswrFace = 0;
+  let peakTempC = -Infinity;
+  let peakTempFace = 0;
+  let peakPhaseErrorDeg = 0;
+  let peakPhaseErrorFace = 0;
 
   for (const face of PRESENT_FACES) {
     const elements = buildFaceElements(face.fceNum, face.elementCount, rng);
@@ -110,10 +138,13 @@ export function buildMockTelemetry(seed = 0xd0_e1): DomeTelemetry {
     const cluster = worstClusterSize(elements.map((e) => e.health), face.kind);
 
     const meanGain = elements.reduce((s, e) => s + e.amplitude, 0) / elements.length;
-    const phases = elements.map((e) => e.phase);
-    const meanPhase = phases.reduce((s, p) => s + p, 0) / phases.length;
-    const phaseRms = Math.sqrt(
-      phases.reduce((s, p) => s + (p - meanPhase) ** 2, 0) / phases.length,
+
+    // RMS of the calibration residual — NOT the spread of raw phase. Taking
+    // an RMS over `phase` would measure the steering ramp built into every
+    // face above, so a perfectly calibrated array pointed off-boresight
+    // would report tens of degrees of "phase RMS" and look broken.
+    const phaseErrorRms = Math.sqrt(
+      elements.reduce((s, e) => s + e.phaseErrorDeg ** 2, 0) / elements.length,
     );
     const meanTemp = elements.reduce((s, e) => s + e.tempC, 0) / elements.length;
 
@@ -123,8 +154,8 @@ export function buildMockTelemetry(seed = 0xd0_e1): DomeTelemetry {
       online,
       total: face.elementCount,
       availabilityPercent: (online / face.elementCount) * 100,
-      meanGainDb: Number(((meanGain - 1) * 20).toFixed(2)),
-      phaseRmsDeg: Number(phaseRms.toFixed(2)),
+      meanExcitationDb: Number(((meanGain - 1) * 20).toFixed(2)),
+      phaseErrorRmsDeg: Number(phaseErrorRms.toFixed(2)),
       vswr: Number((1.1 + rng() * 0.15).toFixed(2)),
       tempC: Number(meanTemp.toFixed(1)),
       worstClusterSize: cluster,
@@ -138,6 +169,23 @@ export function buildMockTelemetry(seed = 0xd0_e1): DomeTelemetry {
       globalWorstCluster = cluster;
       globalWorstFace = face.fceNum;
     }
+
+    // Dome-level peaks, carried with the face that drives them: a peak with
+    // no location is not actionable, and these three are exactly the
+    // readings the readiness verdict trips on (lib/readiness.ts).
+    const ft = faceTelemetry[face.fceNum];
+    if (ft.vswr > peakVswr) {
+      peakVswr = ft.vswr;
+      peakVswrFace = face.fceNum;
+    }
+    if (ft.tempC > peakTempC) {
+      peakTempC = ft.tempC;
+      peakTempFace = face.fceNum;
+    }
+    if (ft.phaseErrorRmsDeg > peakPhaseErrorDeg) {
+      peakPhaseErrorDeg = ft.phaseErrorRmsDeg;
+      peakPhaseErrorFace = face.fceNum;
+    }
   }
 
   const totals: DomeTotals = {
@@ -148,6 +196,12 @@ export function buildMockTelemetry(seed = 0xd0_e1): DomeTelemetry {
     availabilityPercent: Number(((totalOnline / totalElements) * 100).toFixed(2)),
     worstClusterSize: globalWorstCluster,
     worstClusterFace: globalWorstFace,
+    peakVswr,
+    peakVswrFace,
+    peakTempC: peakTempC === -Infinity ? 0 : peakTempC,
+    peakTempFace,
+    peakPhaseErrorDeg,
+    peakPhaseErrorFace,
   };
 
   return {

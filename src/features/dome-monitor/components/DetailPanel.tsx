@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ChevronRight, ShieldCheck, X, Crosshair, ListTree, BellRing } from "lucide-react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { DonutChart, type DonutSlice } from "@/features/data-archival/components/charts/DonutChart";
@@ -12,6 +12,11 @@ import { deriveAlarms } from "../lib/alarms";
 import { HEALTH_META, type HealthId, type FaceTelemetry } from "../types";
 import { Histogram } from "./Histogram";
 import { AlarmsList } from "./AlarmsPanel";
+
+/** Phase-error histogram half-range, in degrees. Set to 3x the alarm limit
+ *  (THRESHOLDS.phaseJitterDeg) so a healthy face is a narrow central spike
+ *  and a face at the limit visibly fills the frame. */
+const PHASE_HIST_LIMIT = THRESHOLDS.phaseJitterDeg * 3;
 
 /** Small premium stat tile — big number, label above, optional delta below. */
 function StatTile({
@@ -135,15 +140,38 @@ function FaceContent({ faceNum }: { faceNum: number }) {
   const faceAlarms = useMemo(() => deriveAlarms(telemetry).filter((a) => a.faceNum === faceNum), [telemetry, faceNum]);
 
   const gainHist = useMemo(() => (ft ? histogram(ft.elements.map((e) => e.amplitude), 10, 0, 1) : []), [ft]);
-  const phaseHist = useMemo(() => (ft ? histogram(ft.elements.map((e) => e.phase), 10, -180, 180) : []), [ft]);
+  // Phase ERROR, not raw phase. A histogram of raw phase is a picture of the
+  // steering ramp — it looks identical on a perfectly calibrated face and
+  // tells the operator nothing. Binned over the alarm limit so the shape is
+  // read against spec: a tight centre spike is a healthy aperture, and
+  // shoulders at the edges are stuck or free-running phase shifters.
+  const phaseErrHist = useMemo(
+    () => (ft ? histogram(ft.elements.map((e) => e.phaseErrorDeg), 10, -PHASE_HIST_LIMIT, PHASE_HIST_LIMIT) : []),
+    [ft],
+  );
   const tempHist = useMemo(() => (ft ? histogram(ft.elements.map((e) => e.tempC), 10) : []), [ft]);
 
   if (!face || !ft) return null;
 
   const flagged = ft.elements.map((el, idx) => ({ ...el, idx })).filter((el) => el.health !== "nominal");
-  const gainDelta = ft.meanGainDb - avg.meanGainDb;
-  const phaseDelta = ft.phaseRmsDeg - avg.phaseRmsDeg;
+  const gainDelta = ft.meanExcitationDb - avg.meanExcitationDb;
+  const phaseDelta = ft.phaseErrorRmsDeg - avg.phaseErrorRmsDeg;
   const tempDelta = ft.tempC - avg.tempC;
+
+  // Clustered or scattered? Same failure count means very different things:
+  // a contiguous hole in the aperture raises sidelobes far more than the
+  // same elements sprinkled at random, and it points at a common-mode cause
+  // (a feed, a PSU rail, a board) rather than end-of-life attrition. This is
+  // the brief's two-minute question — "is this one bad element or a
+  // common-mode failure?" — answered from data already on hand.
+  const faultPattern =
+    flagged.length === 0
+      ? { label: "None", detail: "no flagged elements" }
+      : ft.worstClusterSize >= 5
+        ? { label: "Clustered", detail: `${ft.worstClusterSize} of ${flagged.length} contiguous` }
+        : ft.worstClusterSize <= 2
+          ? { label: "Scattered", detail: `${flagged.length} isolated` }
+          : { label: "Mixed", detail: `worst run ${ft.worstClusterSize} of ${flagged.length}` };
 
   return (
     <>
@@ -163,40 +191,61 @@ function FaceContent({ faceNum }: { faceNum: number }) {
       {/* Stat tiles */}
       <div className="grid grid-cols-3 gap-[0.5rem] px-[1rem] pb-[0.875rem]">
         <StatTile label="Availability" value={ft.availabilityPercent.toFixed(1)} unit="%" />
-        <StatTile label="Worst Cluster" value={`${ft.worstClusterSize}`} unit="el" />
-        <StatTile label="VSWR" value={ft.vswr.toFixed(2)} deltaTone={ft.vswr > THRESHOLDS.vswrMax ? "up" : "flat"} />
         <StatTile
-          label="Mean Gain"
-          value={ft.meanGainDb.toFixed(2)}
-          unit="dB"
+          label="Worst Cluster"
+          value={`${ft.worstClusterSize}`}
+          unit="el"
+          delta={faultPattern.detail}
+          deltaTone={ft.worstClusterSize >= 5 ? "up" : "flat"}
+        />
+        <StatTile
+          label="VSWR"
+          value={ft.vswr.toFixed(2)}
+          delta={`limit ${THRESHOLDS.vswrMax.toFixed(2)}`}
+          deltaTone={ft.vswr > THRESHOLDS.vswrMax ? "up" : "flat"}
+        />
+        {/* "Mean Excitation", not "Mean Gain". The value is the mean element
+            drive level in dB relative to full scale — the array's actual
+            gain in dBi needs the element pattern, lattice and taper, none of
+            which are in this feed, and labelling drive level as "gain"
+            invites an operator to read a −3 dB drive as a −3 dB link. */}
+        <StatTile
+          label="Mean Excitation"
+          value={ft.meanExcitationDb.toFixed(2)}
+          unit="dB FS"
           delta={`${gainDelta >= 0 ? "▲" : "▼"} ${Math.abs(gainDelta).toFixed(2)} dB vs dome avg`}
           deltaTone={gainDelta < -0.3 ? "up" : "flat"}
         />
         <StatTile
-          label="Phase RMS"
-          value={ft.phaseRmsDeg.toFixed(1)}
-          unit="°"
+          label="Phase Error"
+          value={ft.phaseErrorRmsDeg.toFixed(1)}
+          unit="° RMS"
           delta={`${phaseDelta >= 0 ? "▲" : "▼"} ${Math.abs(phaseDelta).toFixed(1)}° vs dome avg`}
-          deltaTone={phaseDelta > 3 ? "up" : "flat"}
+          deltaTone={ft.phaseErrorRmsDeg > THRESHOLDS.phaseJitterDeg ? "up" : "flat"}
         />
         <StatTile
           label="Chassis Temp"
           value={ft.tempC.toFixed(1)}
           unit="°C"
           delta={`${tempDelta >= 0 ? "▲" : "▼"} ${Math.abs(tempDelta).toFixed(1)}°C vs dome avg`}
-          deltaTone={tempDelta > 3 ? "up" : "flat"}
+          deltaTone={ft.tempC >= THRESHOLDS.tempWarnC ? "up" : "flat"}
         />
       </div>
 
       {/* Distribution histograms — real per-element data, binned */}
       <div className="grid grid-cols-3 gap-[0.625rem] border-t-[max(1px,0.0625rem)] border-da-border px-[1rem] py-[0.875rem]">
         <div className="flex flex-col gap-[0.375rem]">
-          <span className="text-[0.5625rem] font-bold uppercase tracking-[0.06em] text-da-label">Gain Distribution</span>
+          <span className="text-[0.5625rem] font-bold uppercase tracking-[0.06em] text-da-label">Excitation (0–1 FS)</span>
           <Histogram bins={gainHist} color="da-c1" className="h-[3.25rem]" />
         </div>
         <div className="flex flex-col gap-[0.375rem]">
-          <span className="text-[0.5625rem] font-bold uppercase tracking-[0.06em] text-da-label">Phase Distribution (°)</span>
-          <Histogram bins={phaseHist} color="da-c3" className="h-[3.25rem]" />
+          <span
+            className="text-[0.5625rem] font-bold uppercase tracking-[0.06em] text-da-label"
+            title={`Measured minus commanded phase, ±${PHASE_HIST_LIMIT}°. A tight centre spike is a calibrated face; shoulders at the edges are stuck or free-running phase shifters.`}
+          >
+            Phase Error (±{PHASE_HIST_LIMIT}°)
+          </span>
+          <Histogram bins={phaseErrHist} color="da-c3" className="h-[3.25rem]" />
         </div>
         <div className="flex flex-col gap-[0.375rem]">
           <span className="text-[0.5625rem] font-bold uppercase tracking-[0.06em] text-da-label">Temperature (°C)</span>
@@ -211,10 +260,21 @@ function FaceContent({ faceNum }: { faceNum: number }) {
           <div className="divide-y-[max(1px,0.0625rem)] divide-da-border/60">
             <InfoRow label="Face ID" value={`${face.fceNum}`} />
             <InfoRow label="Type" value={face.kind === "pentagon" ? "Pentagon" : "Hexagon"} />
-            <InfoRow label="Position (Az/El)" value={`${face.azimuthDeg.toFixed(1)}° / ${face.elevationDeg.toFixed(1)}°`} />
+            <InfoRow
+              label="Boresight (Az/El)"
+              value={`${face.azimuthDeg.toFixed(1)}° / ${face.elevationDeg.toFixed(1)}°`}
+              title="Direction this face points. The Normal Vector row that used to sit below was the same fact as direction cosines — one quantity, printed twice, in the form an operator cannot read."
+            />
             <InfoRow label="Centre (X,Y,Z)" value={`${face.centroid.map((c) => c.toFixed(2)).join(", ")}`} />
-            <InfoRow label="Normal Vector" value={`${face.normal.map((c) => c.toFixed(2)).join(", ")}`} />
+            <InfoRow label="Elements" value={`${ft.total} · ${face.kind === "pentagon" ? "pent lattice" : "hex lattice"}`} />
+            <InfoRow label="Fault Pattern" value={faultPattern.label} />
             <InfoRow label="LRU / Tile" value="Pending B1" dormant title="Awaiting the element → LRU / Tile map from the client (blocker B1)" />
+            <InfoRow
+              label="Beam Contribution"
+              value="Pending B4"
+              dormant
+              title="Whether this face is inside the current beam's scan cone — the real meaning of a face being 'active'. Needs the commanded pointing direction and the element scan limit (blocker B4); it is not derivable from the telemetry we have."
+            />
             <InfoRow label="Last Update" value={new Date(telemetry.timestamp).toLocaleTimeString()} />
           </div>
         </div>
@@ -285,7 +345,8 @@ function FaceContent({ faceNum }: { faceNum: number }) {
                 <span className="flex min-w-0 flex-col leading-none">
                   <span className="da-nums text-2xs font-bold text-da-text">El. {el.idx}</span>
                   <span className="da-nums mt-[0.1875rem] text-3xs font-medium text-da-label">
-                    {el.amplitude.toFixed(2)} · {el.phase}° · {el.tempC.toFixed(0)}°C
+                    {el.amplitude.toFixed(2)} FS · {el.phaseErrorDeg >= 0 ? "+" : "−"}
+                    {Math.abs(el.phaseErrorDeg).toFixed(0)}° · {el.tempC.toFixed(0)}°C
                   </span>
                 </span>
                 <span className="shrink-0 text-3xs font-bold uppercase tracking-[0.06em]" style={{ color: `var(--color-${HEALTH_META[el.health].token})` }}>
@@ -318,8 +379,17 @@ function ElementContent({ faceNum, elementIdx }: { faceNum: number; elementIdx: 
       </span>
       <div className="mt-[0.5rem] divide-y-[max(1px,0.0625rem)] divide-da-border/70">
         <InfoRow label="Health" value={HEALTH_META[el.health].label} />
-        <InfoRow label="Amplitude" value={el.amplitude.toFixed(3)} />
-        <InfoRow label="Phase" value={`${el.phase}°`} />
+        <InfoRow label="Excitation" value={`${el.amplitude.toFixed(3)} FS`} />
+        <InfoRow
+          label="Measured Phase"
+          value={`${el.phase}°`}
+          title="Includes the beam-steering ramp across the face — expected to vary element to element even on a perfectly calibrated aperture."
+        />
+        <InfoRow
+          label="Phase Error"
+          value={`${el.phaseErrorDeg >= 0 ? "+" : "−"}${Math.abs(el.phaseErrorDeg).toFixed(1)}°`}
+          title="Measured minus commanded. This, not the measured phase, is what says whether this element is calibrated."
+        />
         <InfoRow label="Temperature" value={`${el.tempC.toFixed(1)} °C`} />
       </div>
     </div>
@@ -342,9 +412,30 @@ export function DetailPanel({
   onClose: () => void;
 }) {
   const selection = useDomeStore((s) => s.selection);
+  const setPanelWidth = useDomeStore((s) => s.setPanelWidth);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Report our rendered width to the scene, which needs it to centre the
+  // dome in the strip we are NOT covering (domeStore.panelWidth explains
+  // why this is measured rather than derived from PANEL_WIDTH_CSS).
+  //
+  // offsetWidth, not getBoundingClientRect(): the closed state parks the
+  // panel off-screen with `translate-x-full`, and getBoundingClientRect()
+  // reports the transformed box. offsetWidth is transform-blind, so the
+  // width stays correct — and stays measurable — in both states.
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const publish = () => setPanelWidth(Math.round(el.offsetWidth));
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [setPanelWidth]);
 
   return (
     <div
+      ref={panelRef}
       className={cn(
         "absolute inset-y-0 right-0 z-20 flex flex-col overflow-y-auto border-l-[max(1px,0.0625rem)] border-da-border bg-da-surface shadow-[-0.5rem_0_1.5rem_rgba(0,0,0,0.22)] transition-transform",
         open ? "translate-x-0" : "pointer-events-none translate-x-full",
