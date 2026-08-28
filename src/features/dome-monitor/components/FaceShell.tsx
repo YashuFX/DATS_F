@@ -2,10 +2,14 @@
 
 import { useRef, useMemo } from "react";
 import * as THREE from "three";
+import { Html, Line } from "@react-three/drei";
+import { AlertTriangle } from "lucide-react";
 import { useDomeStore } from "../store/domeStore";
 import { FACE_COLOURS } from "../config";
+import { HEALTH_META } from "../types";
 import type { Face } from "../types";
 import { fanIndices } from "../lib/truncatedIcosahedron";
+import { useDragThreshold } from "../hooks/useDragThreshold";
 
 /**
  * FaceShell — one polygon mesh per face of the dome.
@@ -19,9 +23,12 @@ import { fanIndices } from "../lib/truncatedIcosahedron";
 export function FaceShell({
   face,
   isAbsent,
+  showFaultTag,
 }: {
   face: Face;
   isAbsent?: boolean;
+  /** In-scene leader-line badge — caller caps this at the 4 worst faces. */
+  showFaultTag?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const edgeRef = useRef<THREE.LineSegments>(null);
@@ -32,6 +39,7 @@ export function FaceShell({
   const selectFace = useDomeStore((s) => s.selectFace);
   const clearSelection = useDomeStore((s) => s.clearSelection);
   const setHover = useDomeStore((s) => s.setHover);
+  const dragGuard = useDragThreshold();
 
   const isSelected = selection.level === "face" && selection.faceNum === face.fceNum;
   const isHovered = hoveredFace === face.fceNum;
@@ -74,7 +82,6 @@ export function FaceShell({
   }, [face.polygon]);
 
   // Determine colours
-  const colours = isAbsent ? FACE_COLOURS.absent : FACE_COLOURS;
   const fillColour = isAbsent
     ? FACE_COLOURS.absent.fill
     : isHovered
@@ -95,9 +102,11 @@ export function FaceShell({
       <mesh
         ref={meshRef}
         geometry={geometry}
+        onPointerDown={dragGuard.onPointerDown}
         onClick={(e) => {
           if (isAbsent) return;
           e.stopPropagation();
+          if (dragGuard.isDrag(e)) return;
           if (isSelected) {
             clearSelection();
           } else {
@@ -134,6 +143,74 @@ export function FaceShell({
           opacity={isAbsent ? 0.4 : isSelected ? 1 : 0.8}
         />
       </lineSegments>
+
+      {/* Hover = identify only, capped at 3 lines. Click still commits the
+          selection — hovering never does. */}
+      {isHovered && !isAbsent && faceTelemetry && (
+        <Html
+          position={[
+            face.centroid[0] + face.normal[0] * 0.15,
+            face.centroid[1] + face.normal[1] * 0.15,
+            face.centroid[2] + face.normal[2] * 0.15,
+          ]}
+          center
+          pointerEvents="none"
+          zIndexRange={[10, 0]}
+          style={{ transition: "opacity 100ms ease" }}
+        >
+          <div className="pointer-events-none flex flex-col gap-[0.0625rem] whitespace-nowrap rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border bg-da-tooltip px-[0.5rem] py-[0.3125rem] text-da-tooltip-text shadow-da-card">
+            <span className="text-2xs font-bold">
+              Face {face.fceNum} · {face.kind === "pentagon" ? "Pentagon" : "Hexagon"}
+            </span>
+            <span className="text-3xs font-semibold" style={{ color: `var(--color-${HEALTH_META[health].token})` }}>
+              {HEALTH_META[health].label}
+            </span>
+            <span className="text-3xs">
+              {faceTelemetry.availabilityPercent.toFixed(1)}% · {faceTelemetry.online}/{faceTelemetry.total} online
+            </span>
+          </div>
+        </Html>
+      )}
+
+      {/* Redundant non-colour cue for the worst faces — a word ("FAULT") and
+          an icon, not just red. Capped at 4 by the caller so this stays
+          reserved for what's operationally significant. */}
+      {showFaultTag && !isAbsent && (
+        <>
+          <Line
+            points={[
+              [face.centroid[0] + face.normal[0] * 0.05, face.centroid[1] + face.normal[1] * 0.05, face.centroid[2] + face.normal[2] * 0.05],
+              [face.centroid[0] + face.normal[0] * 0.45, face.centroid[1] + face.normal[1] * 0.45, face.centroid[2] + face.normal[2] * 0.45],
+            ]}
+            color={FACE_COLOURS.critical.edge}
+            lineWidth={1}
+            transparent
+            opacity={0.85}
+          />
+          <Html
+            position={[
+              face.centroid[0] + face.normal[0] * 0.45,
+              face.centroid[1] + face.normal[1] * 0.45,
+              face.centroid[2] + face.normal[2] * 0.45,
+            ]}
+            center
+            pointerEvents="none"
+            zIndexRange={[15, 0]}
+          >
+            <div
+              className="pointer-events-none flex items-center gap-[0.25rem] whitespace-nowrap rounded-[0.1875rem] border-[max(1px,0.0625rem)] px-[0.375rem] py-[0.1875rem] text-3xs font-bold uppercase tracking-[0.06em]"
+              style={{
+                borderColor: "var(--color-da-danger)",
+                backgroundColor: "color-mix(in srgb, var(--color-da-danger) 16%, var(--color-da-tooltip))",
+                color: "var(--color-da-danger)",
+              }}
+            >
+              <AlertTriangle className="size-[0.625rem]" strokeWidth={2.4} />
+              Fault · F{face.fceNum}
+            </div>
+          </Html>
+        </>
+      )}
     </group>
   );
 }

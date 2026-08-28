@@ -4,29 +4,38 @@ import { useRef, useMemo, useEffect } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
 import { useDomeStore } from "../store/domeStore";
-import { ELEMENT_COLOURS } from "../config";
 import { getFaceElements } from "../data/geometry";
+import { elementAppearance } from "../lib/elementAppearance";
+import { useDragThreshold } from "../hooks/useDragThreshold";
 import type { Face } from "../types";
 
-const ELEMENT_SIZE = 0.025; // metres — radius of each element dot
+const ELEMENT_SIZE = 0.025; // metres — base radius of each element dot
 
 /**
  * ElementLayer — instanced mesh rendering all elements on one face.
  *
- * One InstancedMesh per face, sharing one small circle geometry. The
- * instanceColor is driven by health/metric state. Clicking an instance
- * yields event.instanceId, giving element identity for free.
+ * One InstancedMesh per face, sharing one small circle geometry. Position,
+ * colour and per-instance scale are all written in a single effect so a
+ * telemetry or metric-mode change never leaves the two out of sync — a fault
+ * gets a bigger dot as well as a different colour (PHASEPLAN §Phase 3: "a
+ * fault must be findable by size as well as hue"), so it stays findable in
+ * greyscale or for a colour-blind operator.
  *
- * Per-face decomposition keeps raycasting cheap: ~374 instances max per face
- * instead of brute-forcing 7,557.
+ * Past ELEMENT_VISIBILITY_DISTANCE the whole layer hides (semantic zoom —
+ * FaceStatusTexture takes over as the aggregate view); R3F's pointer-event
+ * system skips raycasting invisible objects, so this also caps picking cost
+ * for free at the one range where 7 557 targets would matter most.
  */
 export function ElementLayer({ face }: { face: Face }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const invalidate = useThree((s) => s.invalidate);
   const telemetry = useDomeStore((s) => s.telemetry);
   const selection = useDomeStore((s) => s.selection);
+  const metricMode = useDomeStore((s) => s.metricMode);
+  const showElements = useDomeStore((s) => s.elementsVisible);
   const selectElement = useDomeStore((s) => s.selectElement);
   const selectFace = useDomeStore((s) => s.selectFace);
+  const dragGuard = useDragThreshold();
 
   const faceTelemetry = telemetry.faces[face.fceNum];
 
@@ -46,10 +55,11 @@ export function ElementLayer({ face }: { face: Face }) {
     });
   }, []);
 
-  // Set instance matrices (positions + orient to face normal)
+  // Position, orientation, per-instance scale and colour — one pass, so a
+  // fault's size bump and its colour always land in the same frame.
   useEffect(() => {
     const mesh = meshRef.current;
-    if (!mesh) return;
+    if (!mesh || !showElements) return;
 
     const normal = new THREE.Vector3(...face.normal);
     const up = new THREE.Vector3(0, 0, 1);
@@ -57,46 +67,31 @@ export function ElementLayer({ face }: { face: Face }) {
 
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
-    const scale = new THREE.Vector3(1, 1, 1);
-
-    for (let i = 0; i < positions.length; i++) {
-      position.set(positions[i][0], positions[i][1], positions[i][2]);
-      // Offset slightly along normal to avoid z-fighting with face shell
-      position.addScaledVector(normal, 0.003);
-      matrix.compose(position, quaternion, scale);
-      mesh.setMatrixAt(i, matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    invalidate();
-  }, [positions, face.normal, invalidate]);
-
-  // Update instance colours from telemetry
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh || !faceTelemetry) return;
-
     const color = new THREE.Color();
     const isSelectedFace = selection.level !== "array" && selection.faceNum === face.fceNum;
 
     for (let i = 0; i < positions.length; i++) {
-      const el = faceTelemetry.elements[i];
-      if (!el) {
-        color.set(ELEMENT_COLOURS.nominal);
-      } else {
-        const healthColour = ELEMENT_COLOURS[el.health] ?? ELEMENT_COLOURS.nominal;
-        color.set(healthColour);
-      }
+      const isSelectedElement =
+        isSelectedFace && selection.level === "element" && selection.elementIdx === i;
+      const { color: hex, scale } = elementAppearance(
+        faceTelemetry?.elements[i],
+        metricMode,
+        isSelectedElement,
+      );
 
-      // Highlight selected element
-      if (isSelectedFace && selection.level === "element" && selection.elementIdx === i) {
-        color.set("#2dd4bf"); // brand colour
-      }
+      position.set(positions[i][0], positions[i][1], positions[i][2]);
+      // Offset slightly along normal to avoid z-fighting with face shell
+      position.addScaledVector(normal, 0.003);
+      matrix.compose(position, quaternion, new THREE.Vector3(scale, scale, scale));
+      mesh.setMatrixAt(i, matrix);
 
+      color.set(hex);
       mesh.setColorAt(i, color);
     }
+    mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     invalidate();
-  }, [faceTelemetry, selection, positions.length, face.fceNum, invalidate]);
+  }, [positions, face.normal, face.fceNum, faceTelemetry, selection, metricMode, showElements, invalidate]);
 
   if (positions.length === 0) return null;
 
@@ -104,8 +99,11 @@ export function ElementLayer({ face }: { face: Face }) {
     <instancedMesh
       ref={meshRef}
       args={[elementGeo, elementMat, positions.length]}
+      visible={showElements}
+      onPointerDown={dragGuard.onPointerDown}
       onClick={(e) => {
         e.stopPropagation();
+        if (dragGuard.isDrag(e)) return;
         const idx = e.instanceId;
         if (idx !== undefined && idx >= 0) {
           if (selection.level === "element" && selection.faceNum === face.fceNum && selection.elementIdx === idx) {

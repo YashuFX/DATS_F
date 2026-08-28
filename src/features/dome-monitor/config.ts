@@ -9,10 +9,81 @@ import type { CameraPreset } from "./types";
 /** Distance clamp in metres. */
 export const CAMERA_MIN_DISTANCE = 4.5;
 export const CAMERA_MAX_DISTANCE = 30;
-export const CAMERA_DEFAULT_DISTANCE = 9;
+/** Default framing (no selection) — closer than before so the dome reads
+ *  as the hero of the screen; FACE_FRAME_DISTANCE (selected-face framing)
+ *  is unchanged. */
+export const CAMERA_DEFAULT_DISTANCE = 8;
 
 /** Transition timing in ms for preset changes. */
 export const CAMERA_TRANSITION_MS = 450;
+
+/**
+ * Semantic zoom, not geometric LOD (PHASEPLAN §4 tech stack): at the distance
+ * where the dome fills the viewport, elements are already ~9 px apart, so you
+ * never zoom out far enough for a geometric LOD to help. Past this distance
+ * each face instead hides its 7 557-instance dot layer and shows an
+ * aggregate status texture — cheaper, and legible where 7 557 anti-aliased
+ * sub-pixel dots would just read as noise.
+ *
+ * Two thresholds, not one: once the face-select camera reframe animates
+ * `target` as well as `position` (see cameraFraming.ts), distance-to-target
+ * is no longer guaranteed to change monotonically over the transition. A
+ * single threshold could flip the 7 557-instance layer on and off more than
+ * once mid-animation; this hysteresis band means it only flips once you're
+ * clearly on one side or the other.
+ */
+export const ELEMENT_VISIBILITY_SHOW_DISTANCE = 13;
+export const ELEMENT_VISIBILITY_HIDE_DISTANCE = 15;
+
+/** Framing distance used when a face is selected — close enough to read the
+ *  selected face clearly, far enough that the whole dome silhouette (not
+ *  just one face filling the frame) still fits in the left half. */
+export const FACE_FRAME_DISTANCE = 9.5;
+
+/** Vertical FOV the camera is authored at (DomeCanvas creates it with this). */
+export const CAMERA_BASE_FOV = 50;
+
+/**
+ * Widest the fit-guard may open the vertical FOV to when the visible strip
+ * of the viewport is too narrow to hold the dome (see `fitFov` in
+ * lib/cameraFraming.ts). Past ~70 deg the perspective exaggeration starts
+ * reading as fisheye — better a dome that crowds its strip than one that
+ * looks like a different instrument.
+ */
+export const CAMERA_MAX_FIT_FOV = 70;
+
+/**
+ * Bounding radius the fit-guard keeps on screen, in metres. Larger than the
+ * dome's actual silhouette radius (~2.83 m — DOME_CIRCUMRADIUS is the vertex
+ * bound, and the bottom cap is absent) so "fits" means fits with breathing
+ * room, not hugging the edge.
+ */
+export const DOME_FIT_RADIUS = 3.36;
+
+/**
+ * Ceiling on how much of the canvas the detail panel is allowed to count as
+ * obstructed, as a fraction of canvas width. PANEL_WIDTH_CSS is normally at
+ * most 50%, but its `clamp()` floor (24rem) can exceed that on a narrow
+ * card — without this cap the framing would shove the dome off the left
+ * edge chasing a strip barely wider than the panel.
+ */
+export const MAX_OBSTRUCTED_FRACTION = 0.6;
+
+/**
+ * Detail panel width — roughly half the viewport, per spec, clamped so it
+ * stays readable at 1366px and doesn't sprawl at 2560px+.
+ *
+ * Nothing recomputes this clamp in JS. It resolves against a root font-size
+ * that is itself viewport-derived (`min(1.1111vw, 1.8223vh)`, globals.css),
+ * so on any viewport taller than ~16:10 the panel's share of the card grows
+ * with HEIGHT while the canvas width stays put — 38% of the card windowed
+ * vs 46% in fullscreen at 1920x1080. The 3D framing therefore measures the
+ * rendered panel (DetailPanel -> domeStore.panelWidth) instead of holding a
+ * second copy of this rule that would drift the moment either value is
+ * retuned. An earlier version shifted the dome by a fixed fraction of canvas
+ * width, which is exactly the assumption this comment exists to kill.
+ */
+export const PANEL_WIDTH_CSS = "clamp(24rem, 50%, 44rem)";
 
 export const CAMERA_PRESETS: CameraPreset[] = [
   { id: "iso",   label: "ISO",   azimuth:  35, elevation:  25, distance: CAMERA_DEFAULT_DISTANCE },
@@ -85,3 +156,20 @@ export const ELEMENT_COLOURS = {
   critical: "#f87171",
   offline:  "#2a3545",
 } as const;
+
+/** Selection highlight — kept off the nominal/brand hue (trap T5): selection
+ *  and "healthy" must never share a colour, or hue stops meaning anything. */
+export const SELECTED_ELEMENT_COLOUR = "#2dd4bf";
+
+/**
+ * Continuous ramp anchors for analysis modes (Gain / Phase / Temp). These are
+ * literal hex, not CSS custom properties — three.js materials read raw
+ * colour values, not the DOM cascade, so the app's `var(--color-*)` tokens
+ * can't reach the GPU. Interpolation happens in OKLab (see colorRamp.ts) so
+ * a ramp's midpoint looks like a perceptual midpoint.
+ */
+export const GAIN_RAMP: readonly [string, string] = ["#3b82f6", "#f59e0b"];
+export const TEMP_RAMP: readonly [string, string] = ["#3b82f6", "#ef4444"];
+/** Normalised-gain and temperature bounds the two linear ramps map onto. */
+export const GAIN_RAMP_RANGE: readonly [number, number] = [0, 1];
+export const TEMP_RAMP_RANGE: readonly [number, number] = [20, THRESHOLDS.tempCritC];
