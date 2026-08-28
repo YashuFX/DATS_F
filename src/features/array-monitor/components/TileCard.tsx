@@ -2,6 +2,7 @@
 
 import { ArrowUpRight, Fan, Link2, Radio, Thermometer, Zap } from "lucide-react";
 import { cn } from "@/features/data-archival/lib/cn";
+import { cyclicPhaseColor } from "@/features/data-archival/lib/colorRamp";
 import { THRESHOLDS } from "../data/tiles";
 import type { HealthId, MetricId, PolarizationFilter, Tile } from "../types";
 
@@ -48,8 +49,10 @@ function ElementMap({
         } else if (metric === "amplitude") {
           background = `color-mix(in srgb, var(--color-da-brand) ${Math.round(el.amplitude * 100)}%, transparent)`;
         } else {
-          const t = Math.round(((el.phase + 180) / 360) * 100);
-          background = `color-mix(in srgb, var(--color-da-c2) ${Math.max(12, t)}%, transparent)`;
+          // Phase is cyclic — −179° and +179° are 1° apart physically, so this
+          // must wrap. A linear 0..360 → 0..100% ramp puts them at opposite
+          // ends of the scale (see colorRamp.ts).
+          background = cyclicPhaseColor(el.phase);
         }
 
         return (

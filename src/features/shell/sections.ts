@@ -2,6 +2,7 @@ import {
   Archive,
   CalendarClock,
   Crosshair,
+  Hexagon,
   LayoutGrid,
   Settings,
   type LucideIcon,
@@ -12,7 +13,7 @@ import {
  *
  * One entry per section, not per screen: the drill-downs under a section
  * (`/monitor/lru`, `/task-history`) are reached from inside it, so listing them
- * here would turn a four-item switch into a sitemap. `match` is the prefix that
+ * here would turn a multi-item switch into a sitemap. `match` is the prefix that
  * decides which entry is highlighted, which is why `/monitor` and not
  * `/monitor/array` — the section stays lit while you are three levels into it.
  */
@@ -26,6 +27,14 @@ export interface Section {
 }
 
 export const SECTIONS: Section[] = [
+  {
+    id: "dashboard",
+    label: "3D Dome",
+    href: "/dashboard",
+    match: "/dashboard",
+    icon: Hexagon,
+    blurb: "3D operational dashboard for geodesic dome array",
+  },
   {
     id: "monitoring",
     label: "Monitoring",

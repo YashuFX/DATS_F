@@ -6,14 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:geometry": "node --import ./scripts/register-test-hooks.mjs --test --experimental-strip-types \"src/features/dome-monitor/lib/__tests__/*.test.ts\"",
+    "test": "npm run test:geometry",
+    "validate:geometry": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-test-hooks.mjs --experimental-strip-types scripts/validate-dome-geometry.ts"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.33.0",
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "three": "^0.184.0",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -22,6 +28,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.184.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
