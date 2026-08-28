@@ -1,52 +1,15 @@
 "use client";
 
-import { Hexagon, Bell, Clock, CircleHelp, CircleCheck, CircleAlert, CircleX } from "lucide-react";
+import { Hexagon, Bell, Clock } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { ThemeToggle } from "@/features/data-archival/components/shell/ThemeToggle";
 import { SettingsButton } from "@/features/shell/SettingsButton";
 import { useDomeStore } from "../store/domeStore";
-import { computeReadiness, STALE_THRESHOLD_MS, type ReadinessVerdict } from "../lib/readiness";
+import { STALE_THRESHOLD_MS } from "../lib/readiness";
 import { deriveAlarms } from "../lib/alarms";
 import { THRESHOLDS } from "../config";
 import { useNow } from "../hooks/useNow";
-
-const VERDICT_META: Record<ReadinessVerdict, { label: string; token: string; icon: typeof CircleCheck }> = {
-  GO:       { label: "Go",       token: "da-success", icon: CircleCheck },
-  DEGRADED: { label: "Degraded", token: "da-warn",    icon: CircleAlert },
-  NO_GO:    { label: "No-Go",    token: "da-danger",  icon: CircleX },
-  UNKNOWN:  { label: "Unknown",  token: "da-offline", icon: CircleHelp },
-};
-
-/**
- * Readiness verdict against THRESHOLDS (DEMO placeholders — real EIRP/G-T/SLL
- * floor is blocker B3). Ticks every second purely to re-evaluate staleness —
- * telemetry itself only changes on the mock feed's own 4 s cadence.
- */
-function ReadinessBadge() {
-  const telemetry = useDomeStore((s) => s.telemetry);
-  const now = useNow();
-
-  const { verdict, reason } = computeReadiness(telemetry, now);
-  const meta = VERDICT_META[verdict];
-  const Icon = meta.icon;
-
-  return (
-    <span
-      title={reason}
-      className="flex items-center gap-[0.375rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] px-[0.5rem] py-[0.25rem]"
-      style={{
-        borderColor: `color-mix(in srgb, var(--color-${meta.token}) 35%, transparent)`,
-        backgroundColor: `color-mix(in srgb, var(--color-${meta.token}) 12%, transparent)`,
-      }}
-    >
-      <Icon className="size-[0.8125rem]" strokeWidth={2.2} style={{ color: `var(--color-${meta.token})` }} />
-      <span className="da-nums text-3xs font-bold uppercase tracking-[0.08em]" style={{ color: `var(--color-${meta.token})` }}>
-        {meta.label}
-      </span>
-    </span>
-  );
-}
 
 /**
  * Label-over-value header stat — the header's own version of a KPI tile.
@@ -223,13 +186,6 @@ export function DomeShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-[0.625rem]">
-          <ReadinessBadge />
-
-          {/* Demo data marker */}
-          <span className="rounded-[0.1875rem] border-[max(1px,0.0625rem)] border-da-info/30 bg-da-info-soft px-[0.375rem] py-[0.125rem] text-3xs font-bold uppercase tracking-[0.08em] text-da-info">
-            Demo Data
-          </span>
-
           <SettingsButton />
           <ThemeToggle />
 

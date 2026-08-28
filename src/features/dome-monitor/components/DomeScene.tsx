@@ -40,7 +40,6 @@ export function DomeScene({
   const { camera, invalidate, size } = useThree();
 
   const clearSelection = useDomeStore((s) => s.clearSelection);
-  const telemetry = useDomeStore((s) => s.telemetry);
   const selection = useDomeStore((s) => s.selection);
   const reframeNonce = useDomeStore((s) => s.reframeNonce);
   const alarmsOpen = useDomeStore((s) => s.alarmsOpen);
@@ -62,20 +61,6 @@ export function DomeScene({
     // changed (the user drifted away with the orbit controls).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection.level, selection.faceNum, manualPreset, camera, reframeNonce]);
-
-  // In-scene fault tags, capped at 4 (PHASEPLAN §Phase 5) — the worst
-  // clusters win the cap so the tags stay attached to what's operationally
-  // significant rather than whichever face happens to sort first.
-  const faultTagFaces = useMemo(() => {
-    return new Set(
-      PRESENT_FACES
-        .map((f) => ({ fceNum: f.fceNum, ft: telemetry.faces[f.fceNum] }))
-        .filter((x): x is { fceNum: number; ft: NonNullable<typeof x.ft> } => x.ft?.health === "critical")
-        .sort((a, b) => b.ft.worstClusterSize - a.ft.worstClusterSize)
-        .slice(0, 4)
-        .map((x) => x.fceNum),
-    );
-  }, [telemetry]);
 
   // Absent faces (bottom cap)
   const absentFaces = ALL_FACES.filter((f) => !f.present);
@@ -258,7 +243,7 @@ export function DomeScene({
       {/* Present faces — full shells + elements */}
       {PRESENT_FACES.map((face) => (
         <group key={face.fceNum}>
-          <FaceShell face={face} showFaultTag={faultTagFaces.has(face.fceNum)} />
+          <FaceShell face={face} />
           <ElementLayer face={face} />
           <FaceStatusTexture face={face} />
         </group>
