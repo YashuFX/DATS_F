@@ -1,8 +1,10 @@
 "use client";
 
 import { Sliders } from "lucide-react";
-import { MetricLegend } from "./MetricLegend";
+import { MetricModeSelect } from "./MetricModeSelect";
 import { CameraPresets } from "./CameraPresets";
+import { OrbitPuck } from "./OrbitPuck";
+import { ViewActions } from "./ViewActions";
 import type { CameraPreset, MetricMode } from "../types";
 
 /**
@@ -37,12 +39,27 @@ export function ViewportHud({
 }) {
   return (
     <div className="pointer-events-none absolute inset-x-[0.75rem] bottom-[0.75rem] z-10 flex items-end justify-between gap-[0.75rem]">
-      <div className="pointer-events-auto flex items-center gap-[0.625rem] rounded-[0.375rem] border-[max(1px,0.0625rem)] border-da-border bg-da-chrome/85 px-[0.625rem] py-[0.5rem] shadow-da-card backdrop-blur-[0.5rem]">
-        <span className="flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.08em] text-da-muted">
-          <Sliders className="size-[0.8125rem]" strokeWidth={2.2} />
-          Metric
-        </span>
-        <MetricLegend metricMode={metricMode} onModeChange={onMetricModeChange} />
+      {/* Left stack: the orbit puck sits above the metric pill rather than
+          beside the camera presets on the right, because the detail panel
+          (z-20) overlays the right half and would hide it exactly while a
+          face is selected. See the comment in OrbitPuck.tsx. */}
+      <div className="flex flex-col items-start gap-[0.5rem]">
+        {/* Continuous control and discrete controls, bottom-aligned so they
+            read as one cluster rather than two floating pills. */}
+        {show3dControls && (
+          <div className="flex items-end gap-[0.5rem]">
+            <OrbitPuck />
+            <ViewActions />
+          </div>
+        )}
+
+        <div className="pointer-events-auto flex items-center gap-[0.625rem] rounded-[0.375rem] border-[max(1px,0.0625rem)] border-da-border bg-da-chrome/85 px-[0.625rem] py-[0.5rem] shadow-da-card backdrop-blur-[0.5rem]">
+          <span className="flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.08em] text-da-muted">
+            <Sliders className="size-[0.8125rem]" strokeWidth={2.2} />
+            Metric
+          </span>
+          <MetricModeSelect metricMode={metricMode} onModeChange={onMetricModeChange} />
+        </div>
       </div>
 
       {show3dControls && (

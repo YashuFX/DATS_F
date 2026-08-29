@@ -150,6 +150,13 @@ export function DomeCanvas({
             failIfMajorPerformanceCaveat: false,
           }}
           camera={{
+            // `up` is deliberately NOT set here. The dome is Z-up, and
+            // DomeScene sets camera.up during its render pass because
+            // OrbitControls reads that vector exactly once, in a constructor
+            // that runs while DomeScene's children render — see the comment
+            // there. Setting it in two places invites someone to delete the
+            // one that is load-bearing.
+            //
             // Authored value only — DomeScene re-derives fov every time the
             // canvas or the detail panel resizes, so the dome stays inside
             // the strip the panel is not covering (lib/cameraFraming.fitFov).

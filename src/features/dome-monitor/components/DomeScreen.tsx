@@ -9,6 +9,7 @@ import { FACE_MAP } from "../data/geometry";
 import { HEALTH_META } from "../types";
 import type { CameraPreset } from "../types";
 import { DetailPanel } from "./DetailPanel";
+import { ElementLegend } from "./ElementLegend";
 import { ViewportHud } from "./ViewportHud";
 import { useSelectionUrlSync } from "../hooks/useSelectionUrlSync";
 import { useDomeKeyboard } from "../hooks/useDomeKeyboard";
@@ -201,6 +202,15 @@ export function DomeScreen() {
             <span className="w-fit rounded-[0.25rem] bg-da-surface/70 px-[0.5rem] py-[0.1875rem] text-3xs font-medium uppercase tracking-[0.06em] text-da-label backdrop-blur-[0.125rem]">
               Truncated icosahedron · 26 faces · R = 3.000 m
             </span>
+            {/* The legend joins the top-left "what am I looking at" column
+                rather than taking a corner of its own: the detail panel
+                overlays the right half, the HUD owns the bottom edge, and
+                the top-right is the view switcher — this is the one edge
+                nothing else claims at any selection state. It is the only
+                child here that takes pointer events (the column is
+                pointer-events-none so drags pass through to OrbitControls),
+                which it needs for its collapse toggle. */}
+            <ElementLegend metricMode={metricMode} />
           </div>
         )}
 

@@ -40,6 +40,16 @@ export const ELEMENT_VISIBILITY_HIDE_DISTANCE = 15;
  *  just one face filling the frame) still fits in the left half. */
 export const FACE_FRAME_DISTANCE = 9.5;
 
+/**
+ * How far off the horizon a face may be framed from, in degrees.
+ *
+ * At ±90° the camera sits on the up axis, where azimuth is undefined and
+ * both `lookAt` and OrbitControls' spherical coordinates degenerate — the
+ * view would roll to an arbitrary angle and a drag would flip it. 85° keeps
+ * a 5° margin. Only face 27, the zenith pentagon, is clamped by it.
+ */
+export const FACE_FRAME_MAX_ELEVATION = 85;
+
 /** Vertical FOV the camera is authored at (DomeCanvas creates it with this). */
 export const CAMERA_BASE_FOV = 50;
 
@@ -85,13 +95,27 @@ export const MAX_OBSTRUCTED_FRACTION = 0.6;
  */
 export const PANEL_WIDTH_CSS = "clamp(24rem, 50%, 44rem)";
 
+/**
+ * Preset framings, in the SAME angle convention as the face geometry:
+ * azimuth counter-clockwise from +X, elevation up from the XY plane, +Z at
+ * the zenith (see `frameToPosition` in lib/cameraFraming.ts, the one place
+ * these become a world position). The compass labels name world axes —
+ * +Y is North, +X is East — which is why N reads 90 and E reads 0 rather
+ * than the other way round.
+ *
+ * They were previously authored in a second, compass convention (0 = +Y,
+ * clockwise) that only the scene's own inline maths spoke. That is what made
+ * face framing point at the wrong face, and it left N and S degenerate: at
+ * elevation 0 both put the camera on ±Y, which under the old Y-up camera was
+ * the up vector itself, so `lookAt` had no defined roll.
+ */
 export const CAMERA_PRESETS: CameraPreset[] = [
-  { id: "iso",   label: "ISO",   azimuth:  35, elevation:  25, distance: CAMERA_DEFAULT_DISTANCE },
-  { id: "top",   label: "TOP",   azimuth:   0, elevation:  89, distance: CAMERA_DEFAULT_DISTANCE },
-  { id: "north", label: "N",     azimuth:   0, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
-  { id: "east",  label: "E",     azimuth:  90, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
-  { id: "south", label: "S",     azimuth: 180, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
-  { id: "west",  label: "W",     azimuth: 270, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
+  { id: "iso",   label: "ISO",   azimuth:  55, elevation:  25, distance: CAMERA_DEFAULT_DISTANCE },
+  { id: "top",   label: "TOP",   azimuth:  90, elevation:  85, distance: CAMERA_DEFAULT_DISTANCE },
+  { id: "north", label: "N",     azimuth:  90, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
+  { id: "east",  label: "E",     azimuth:   0, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
+  { id: "south", label: "S",     azimuth: 270, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
+  { id: "west",  label: "W",     azimuth: 180, elevation:   0, distance: CAMERA_DEFAULT_DISTANCE },
 ];
 
 /* ---------- health thresholds ---------- */

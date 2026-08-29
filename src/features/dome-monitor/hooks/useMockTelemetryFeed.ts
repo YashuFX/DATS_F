@@ -21,12 +21,18 @@ const TICK_MS = 4000;
  */
 export function useMockTelemetryFeed() {
   const tick = useRef(0);
+  const paused = useDomeStore((s) => s.feedPaused);
 
   useEffect(() => {
+    // Holding the feed stops the clock, it does not rewind it: `tick` lives
+    // in a ref, so resuming carries on from where the link left off rather
+    // than snapping the dome back to tick 0.
+    if (paused) return;
+
     const id = window.setInterval(() => {
       tick.current += 1;
       useDomeStore.getState().updateTelemetry(buildMockTelemetry(0xd0_e1 + tick.current));
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [paused]);
 }

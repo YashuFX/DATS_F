@@ -9,8 +9,10 @@
 import { create } from "zustand";
 import type { DomeTelemetry, MetricMode, SelectionRef } from "../types";
 import { MOCK_TELEMETRY } from "../data/telemetry.mock";
+import { clampOrbitElevation } from "../lib/cameraFraming";
 import {
   CAMERA_DEFAULT_DISTANCE,
+  CAMERA_PRESETS,
   ELEMENT_VISIBILITY_SHOW_DISTANCE,
   ELEMENT_VISIBILITY_HIDE_DISTANCE,
 } from "../config";
@@ -28,6 +30,28 @@ export interface DomeState {
   revision: number;
   /** Distance from the dome centre to the camera (metres). */
   cameraDistance: number;
+  /**
+   * Where the camera currently sits, as the orbit puck's readout needs it:
+   * azimuth in [0, 360), elevation in degrees, same convention as the face
+   * geometry (lib/cameraFraming.ts). Written by the scene on every camera
+   * move, from OrbitControls' own state — so it stays correct whether the
+   * move came from a drag, the wheel, a preset, or the puck itself.
+   */
+  cameraAzimuth: number;
+  cameraElevation: number;
+  /**
+   * A hand-driven orbit, written by the puck and consumed by the scene.
+   *
+   * The store is the channel because it is the one that already works from
+   * both sides of the R3F Canvas boundary (the scene reads it, the DOM HUD
+   * writes it), and because it keeps the puck free of any three.js import.
+   * `nonce` is what makes a repeat of the same angles still register — the
+   * same trick `reframeNonce` plays for "Zoom to Face".
+   *
+   * Applied instantly, never animated: this is a live drag, and a 450 ms
+   * ease would lag a full drag behind the pointer.
+   */
+  orbitRequest: { azimuth: number; elevation: number; nonce: number } | null;
   /**
    * Semantic zoom — whether faces show 7 557 individual element dots
    * (true) or an aggregate status texture (false). Computed here, in one
@@ -69,6 +93,27 @@ export interface DomeState {
    * second source of truth — see the comment on PANEL_WIDTH_CSS.
    */
   panelWidth: number;
+  /**
+   * Whether the live telemetry link is held.
+   *
+   * Reading a face's flagged-element list while the numbers change underneath
+   * every 4 s is the problem this exists to solve. It is deliberately a
+   * FIRST-CLASS, VISIBLE state rather than a quiet toggle: a paused feed
+   * means the dome is showing stale data, and an operator who has forgotten
+   * that is in a worse position than one who never paused. ViewActions tints
+   * its own control while this is true, and the header's LAST UPDATE clock
+   * stops advancing.
+   */
+  feedPaused: boolean;
+  /**
+   * A request to capture the viewport as a PNG, consumed by the scene.
+   *
+   * It has to be the scene that does it: only DomeScene holds the WebGL
+   * renderer, and with `frameloop="demand"` the drawing buffer is not valid
+   * to read at an arbitrary moment — it must be rendered and read inside the
+   * same task. Same nonce trick as `orbitRequest`.
+   */
+  snapshotRequest: { nonce: number } | null;
   /** Bumped by requestReframe() so "Zoom to Face" re-triggers the camera lerp
    *  even when the selection itself hasn't changed (the user drifted away
    *  with the orbit controls and wants to snap back). */
@@ -81,12 +126,15 @@ export interface DomeState {
   setHover: (fceNum: number | null) => void;
   setMetricMode: (mode: MetricMode) => void;
   updateTelemetry: (t: DomeTelemetry) => void;
-  setCameraDistance: (d: number) => void;
+  setCameraPose: (distance: number, azimuth: number, elevation: number) => void;
+  requestOrbit: (azimuth: number, elevation: number) => void;
   acknowledgeAlarm: (id: string) => void;
   shelveAlarm: (id: string, durationMs: number) => void;
   setAlarmsOpen: (open: boolean) => void;
   setPanelWidth: (width: number) => void;
   requestReframe: () => void;
+  setFeedPaused: (paused: boolean) => void;
+  requestSnapshot: () => void;
 }
 
 export const useDomeStore = create<DomeState>((set) => ({
@@ -96,10 +144,15 @@ export const useDomeStore = create<DomeState>((set) => ({
   telemetry: MOCK_TELEMETRY,
   revision: 0,
   cameraDistance: CAMERA_DEFAULT_DISTANCE,
+  cameraAzimuth: CAMERA_PRESETS[0].azimuth,
+  cameraElevation: CAMERA_PRESETS[0].elevation,
+  orbitRequest: null,
   elementsVisible: CAMERA_DEFAULT_DISTANCE <= ELEMENT_VISIBILITY_SHOW_DISTANCE,
   alarmAcks: {},
   alarmsOpen: false,
   panelWidth: 0,
+  feedPaused: false,
+  snapshotRequest: null,
   reframeNonce: 0,
 
   selectFace: (fceNum) =>
@@ -120,13 +173,40 @@ export const useDomeStore = create<DomeState>((set) => ({
   updateTelemetry: (t) =>
     set((state) => ({ telemetry: t, revision: state.revision + 1 })),
 
-  setCameraDistance: (d) =>
+  // Fires on EVERY OrbitControls change event — a drag is ~60 of these a
+  // second — so it bails on a move too small to show anywhere. Without that
+  // the puck would re-render on sub-pixel damping settle long after the
+  // camera has visually stopped.
+  setCameraPose: (distance, azimuth, elevation) =>
     set((state) => {
       let elementsVisible = state.elementsVisible;
-      if (elementsVisible && d >= ELEMENT_VISIBILITY_HIDE_DISTANCE) elementsVisible = false;
-      else if (!elementsVisible && d <= ELEMENT_VISIBILITY_SHOW_DISTANCE) elementsVisible = true;
-      return { cameraDistance: d, elementsVisible };
+      if (elementsVisible && distance >= ELEMENT_VISIBILITY_HIDE_DISTANCE) elementsVisible = false;
+      else if (!elementsVisible && distance <= ELEMENT_VISIBILITY_SHOW_DISTANCE) elementsVisible = true;
+
+      const settled =
+        elementsVisible === state.elementsVisible &&
+        Math.abs(distance - state.cameraDistance) < 1e-3 &&
+        Math.abs(elevation - state.cameraElevation) < 0.05 &&
+        // Azimuth wraps: 359.99 -> 0.01 is a small move, not a 360 one.
+        Math.abs(((azimuth - state.cameraAzimuth + 540) % 360) - 180) < 0.05;
+      if (settled) return state;
+
+      return {
+        cameraDistance: distance,
+        cameraAzimuth: azimuth,
+        cameraElevation: elevation,
+        elementsVisible,
+      };
     }),
+
+  requestOrbit: (azimuth, elevation) =>
+    set((state) => ({
+      orbitRequest: {
+        azimuth: ((azimuth % 360) + 360) % 360,
+        elevation: clampOrbitElevation(elevation),
+        nonce: (state.orbitRequest?.nonce ?? 0) + 1,
+      },
+    })),
 
   acknowledgeAlarm: (id) =>
     set((state) => ({
@@ -153,4 +233,9 @@ export const useDomeStore = create<DomeState>((set) => ({
     set((state) => (state.panelWidth === width ? state : { panelWidth: width })),
 
   requestReframe: () => set((state) => ({ reframeNonce: state.reframeNonce + 1 })),
+
+  setFeedPaused: (paused) => set({ feedPaused: paused }),
+
+  requestSnapshot: () =>
+    set((state) => ({ snapshotRequest: { nonce: (state.snapshotRequest?.nonce ?? 0) + 1 } })),
 }));

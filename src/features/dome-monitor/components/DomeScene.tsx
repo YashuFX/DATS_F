@@ -10,7 +10,15 @@ import { useDomeStore } from "../store/domeStore";
 import { FaceShell } from "./FaceShell";
 import { ElementLayer } from "./ElementLayer";
 import { FaceStatusTexture } from "./FaceStatusTexture";
-import { DOME_CENTER_TARGET, centeredFrame, faceFrame, viewportFraming } from "../lib/cameraFraming";
+import {
+  DOME_CENTER_TARGET,
+  DOME_UP,
+  centeredFrame,
+  faceFrame,
+  frameToPosition,
+  positionToOrientation,
+  viewportFraming,
+} from "../lib/cameraFraming";
 import { useDragThreshold } from "../hooks/useDragThreshold";
 import type { CameraPreset } from "../types";
 
@@ -37,13 +45,31 @@ export function DomeScene({
   manualPreset: CameraPreset;
 }) {
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
-  const { camera, invalidate, size } = useThree();
+  const { camera, invalidate, size, gl, scene } = useThree();
+
+  // The dome is Z-up: `Face.elevationDeg` is `asin(normal.z)`, the zenith
+  // pentagon sits at +Z and the missing foot at -Z. three.js defaults to
+  // Y-up, which put OrbitControls' orbit axis on a HORIZONTAL axis of the
+  // dome — vertical drags tumbled it sideways, every framed face landed
+  // rolled to whatever angle world +Y happened to project to, and the N/S
+  // presets (elevation 0, camera on ±Y) sat exactly on the up vector, where
+  // `lookAt` has no defined roll at all.
+  //
+  // Set during render rather than in an effect on purpose: OrbitControls
+  // snapshots `object.up` ONCE, in its constructor
+  // (`this._quat = setFromUnitVectors(object.up, (0,1,0))`, three r184) and
+  // never re-reads it — and drei constructs it in a render-phase useMemo of
+  // the child below. An effect here would run after that snapshot was
+  // already taken from the wrong vector.
+  useMemo(() => camera.up.fromArray(DOME_UP), [camera]);
 
   const clearSelection = useDomeStore((s) => s.clearSelection);
   const selection = useDomeStore((s) => s.selection);
   const reframeNonce = useDomeStore((s) => s.reframeNonce);
   const alarmsOpen = useDomeStore((s) => s.alarmsOpen);
   const panelWidth = useDomeStore((s) => s.panelWidth);
+  const orbitRequest = useDomeStore((s) => s.orbitRequest);
+  const snapshotRequest = useDomeStore((s) => s.snapshotRequest);
   const emptySpaceDragGuard = useDragThreshold();
 
   // The camera always targets the dome's true centre, selected or not — the
@@ -65,73 +91,212 @@ export function DomeScene({
   // Absent faces (bottom cap)
   const absentFaces = ALL_FACES.filter((f) => !f.present);
 
-  // Apply camera frame (preset or face-biased) — a plain Vector3 lerp of
+  // Apply camera frame (preset or selected face) — a plain Vector3 lerp of
   // camera.position PLUS an independent lerp of the look-at target, so a
   // face selection can move both where the camera sits and what it's
   // biased toward in one synchronized motion.
-  useEffect(() => {
-    if (!activeFrame || !controlsRef.current) return;
+  //
+  // `frameToPosition` owns the spherical->cartesian step (lib/cameraFraming.ts).
+  // It used to be inlined here in a different angle convention from the one
+  // the face data is in, which is what sent the camera to the wrong face; it
+  // also has to be anchored at the orbit target, not the world origin, or the
+  // camera never actually lands on the boresight it was given.
+  // Set by the fly-to below while it is in flight, so anything that takes
+  // over the camera mid-transition can stop it first. Two things write
+  // camera.position every frame is one thing too many: they fight, and
+  // whichever runs last wins the frame, which reads as juddering.
+  const cancelTransitionRef = useRef<(() => void) | null>(null);
 
-    const azRad = (activeFrame.azimuth * Math.PI) / 180;
-    const elRad = (activeFrame.elevation * Math.PI) / 180;
-    const d = activeFrame.distance;
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!activeFrame || !controls) return;
 
     const endTarget = new THREE.Vector3(...activeFrame.target);
-    const x = d * Math.cos(elRad) * Math.sin(azRad);
-    const y = d * Math.cos(elRad) * Math.cos(azRad);
-    const z = d * Math.sin(elRad);
-
+    const endPos = new THREE.Vector3(...frameToPosition(activeFrame));
     const startPos = camera.position.clone();
-    const endPos = new THREE.Vector3(x, y, z);
-    const startTarget = controlsRef.current.target.clone();
+    const startTarget = controls.target.clone();
+
+    const settle = (position: THREE.Vector3, target: THREE.Vector3) => {
+      camera.position.copy(position);
+      camera.lookAt(target);
+      controls.target.copy(target);
+      controls.update();
+      invalidate();
+    };
 
     if (prefersReducedMotion()) {
-      camera.position.copy(endPos);
-      camera.lookAt(endTarget);
-      controlsRef.current.target.copy(endTarget);
-      controlsRef.current.update();
-      invalidate();
+      settle(endPos, endTarget);
       return;
     }
 
+    // One in-flight transition at a time. Without the cancel, clicking a
+    // second tile mid-flight left BOTH loops writing camera.position every
+    // frame — they fight, the dome judders, and whichever loop happens to
+    // finish last wins, so the camera can settle on the face you no longer
+    // have selected. Cleanup runs before the next effect, and the new lerp
+    // starts from wherever this one got to, so interrupting still looks
+    // like one continuous move.
+    let frame = 0;
+    let cancelled = false;
     const startTime = performance.now();
-    const duration = CAMERA_TRANSITION_MS;
+    const lerped = new THREE.Vector3();
 
-    function animate() {
-      const now = performance.now();
-      const t = Math.min(1, (now - startTime) / duration);
+    const stop = () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      cancelTransitionRef.current = null;
+    };
+    cancelTransitionRef.current = stop;
+
+    const animate = () => {
+      if (cancelled) return;
+      const t = Math.min(1, (performance.now() - startTime) / CAMERA_TRANSITION_MS);
       // Smooth ease-out
       const ease = 1 - Math.pow(1 - t, 3);
 
-      camera.position.lerpVectors(startPos, endPos, ease);
-      const target = startTarget.clone().lerp(endTarget, ease);
-      camera.lookAt(target);
-      if (controlsRef.current) {
-        controlsRef.current.target.copy(target);
-        controlsRef.current.update();
-      }
-      invalidate();
+      settle(
+        lerped.lerpVectors(startPos, endPos, ease),
+        startTarget.clone().lerp(endTarget, ease),
+      );
 
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      }
-    }
-    animate();
+      if (t < 1) frame = requestAnimationFrame(animate);
+      else cancelTransitionRef.current = null;
+    };
+    frame = requestAnimationFrame(animate);
+
+    // A drag, a wheel or a puck grab that starts mid-flight takes the camera
+    // over immediately rather than wrestling the remaining frames for it.
+    // OrbitControls raises "start" only for real user input, never for the
+    // `controls.update()` calls the loop above makes.
+    controls.addEventListener("start", stop);
+
+    return () => {
+      controls.removeEventListener("start", stop);
+      stop();
+    };
   }, [activeFrame, camera, invalidate]);
+
+  // A hand-driven orbit from the HUD puck: snap to the requested heading at
+  // whatever distance the camera is already at, so the puck turns the dome
+  // without also dollying it. `frameToPosition` again — the puck speaks the
+  // same azimuth/elevation the faces and presets do, and nothing here has
+  // its own idea of what those mean.
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!orbitRequest || !controls) return;
+
+    cancelTransitionRef.current?.();
+
+    const target = controls.target;
+    const distance = camera.position.distanceTo(target);
+    camera.position.set(
+      ...frameToPosition({
+        azimuth: orbitRequest.azimuth,
+        elevation: orbitRequest.elevation,
+        distance,
+        target: [target.x, target.y, target.z],
+      }),
+    );
+    camera.lookAt(target);
+    controls.update();
+    invalidate();
+  }, [orbitRequest, camera, invalidate]);
+
+  // Snapshot the viewport as a PNG.
+  //
+  // This has to live in the scene, and it has to be synchronous. The canvas
+  // runs `frameloop="demand"` without `preserveDrawingBuffer`, so the WebGL
+  // drawing buffer is only valid to read back inside the same task that drew
+  // it — hence the explicit `gl.render` immediately before `toDataURL`
+  // rather than reading whatever happens to be there. Turning
+  // preserveDrawingBuffer on instead would make every frame of a 7 557-dot
+  // scene pay for a capture that happens once in a session.
+  //
+  // The result is then composited onto the viewport's own backdrop, because
+  // the canvas is deliberately transparent (DomeCanvas: `alpha: true`, clear
+  // colour 0). Exporting it raw hands the operator a dome floating on
+  // nothing, which lands unreadable in any light-background document.
+  useEffect(() => {
+    if (!snapshotRequest) return;
+
+    gl.render(scene, camera);
+
+    const source = gl.domElement;
+
+    // Crop away the strip the detail panel is sitting on. The panel overlays
+    // the canvas rather than resizing it, so the renderer happily draws a
+    // full-width frame whose right ~46% nobody can see — and the projection
+    // has already shifted the dome out of it (`setViewOffset`, below). Export
+    // that raw and you hand someone a dome squashed against the left edge of
+    // a half-empty picture. Cropping to the same strip the framing maths
+    // already targets makes the file match what is on screen.
+    //
+    // `source` is sized in device pixels and `size` in CSS pixels, hence the
+    // ratio rather than using obstructedPx directly.
+    const panelOpen = selection.level !== "array" || alarmsOpen;
+    const { obstructedPx } = viewportFraming(
+      size.width,
+      size.height,
+      panelWidth,
+      activeFrame.distance,
+      panelOpen,
+    );
+    const scale = size.width > 0 ? source.width / size.width : 1;
+    const visibleWidth = Math.max(1, Math.round(source.width - obstructedPx * scale));
+
+    const sheet = document.createElement("canvas");
+    sheet.width = visibleWidth;
+    sheet.height = source.height;
+    const ctx = sheet.getContext("2d");
+    if (!ctx) return;
+
+    const backdrop = getComputedStyle(document.documentElement)
+      .getPropertyValue("--color-da-dome-viewport")
+      .trim();
+    ctx.fillStyle = backdrop || "#0a1512";
+    ctx.fillRect(0, 0, sheet.width, sheet.height);
+    ctx.drawImage(source, 0, 0, visibleWidth, source.height, 0, 0, visibleWidth, source.height);
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const link = document.createElement("a");
+    link.href = sheet.toDataURL("image/png");
+    link.download = `dome-array-${stamp}.png`;
+    link.click();
+  }, [
+    snapshotRequest,
+    gl,
+    scene,
+    camera,
+    selection.level,
+    alarmsOpen,
+    panelWidth,
+    activeFrame.distance,
+    size.width,
+    size.height,
+  ]);
 
   // Semantic zoom (PHASEPLAN §4 tech stack): every camera move (drag, wheel,
   // or the preset animation loop above, which calls invalidate() every
   // frame) reports distance-from-target so ElementLayer/FaceStatusTexture
-  // can swap between per-element dots and the face-aggregate texture.
+  // can swap between per-element dots and the face-aggregate texture. The
+  // same report carries the heading the orbit puck reads back, so the puck
+  // tracks the camera however it was moved — including by the puck.
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
-    const reportDistance = () => {
-      useDomeStore.getState().setCameraDistance(camera.position.distanceTo(controls.target));
+    const reportPose = () => {
+      const target = controls.target;
+      const { azimuth, elevation } = positionToOrientation(
+        [camera.position.x, camera.position.y, camera.position.z],
+        [target.x, target.y, target.z],
+      );
+      useDomeStore
+        .getState()
+        .setCameraPose(camera.position.distanceTo(target), azimuth, elevation);
     };
-    controls.addEventListener("change", reportDistance);
-    reportDistance();
-    return () => controls.removeEventListener("change", reportDistance);
+    controls.addEventListener("change", reportPose);
+    reportPose();
+    return () => controls.removeEventListener("change", reportPose);
   }, [camera]);
 
   // Frame the dome inside the part of the canvas the operator can actually
