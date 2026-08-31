@@ -27,6 +27,8 @@ import { NotificationsTab } from "@/features/settings/components/tabs/Notificati
 import { SystemTab } from "@/features/settings/components/tabs/SystemTab";
 import { useSettingsStore } from "@/features/settings/store/settingsStore";
 import { applyThemeMode, readTheme, THEME_EVENT, type Theme } from "@/lib/theme";
+import { BrandMark } from "./BrandMark";
+import { OperatorChip } from "./OperatorChip";
 
 /**
  * SETTINGS.
@@ -174,17 +176,11 @@ export function SettingsScreen() {
           >
             <ArrowLeft className="size-[0.9375rem]" strokeWidth={2.2} />
           </Link>
-          <span className="flex min-w-0 flex-col leading-none">
-            <span className="text-md font-bold tracking-[-0.01em] text-da-text">
-              SETTINGS
-            </span>
-            <span className="mt-[0.1875rem] truncate text-3xs font-medium text-da-muted">
-              {current.blurb}
-            </span>
-          </span>
+          <BrandMark section="Settings" />
         </div>
 
         <div className="flex shrink-0 items-center gap-[0.5rem]">
+          <OperatorChip />
           <span className="hidden items-center gap-[0.375rem] text-3xs font-bold uppercase tracking-[0.08em] text-da-muted md:flex">
             <Check className="size-[0.75rem] text-da-success" strokeWidth={3} />
             {hydrated ? "Saved on this device" : "Loading…"}

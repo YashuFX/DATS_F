@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, User } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+import { BrandMark } from '@/features/shell/BrandMark';
+import { OperatorChip } from '@/features/shell/OperatorChip';
 import { useDashboard } from '../context/DashboardContext';
 
 export default function Header() {
@@ -33,6 +35,9 @@ export default function Header() {
 
   return (
     <header className="flex items-center justify-between shrink-0 bg-da-surface border-b-[max(1px,0.0625rem)] border-da-border px-6 py-1.5 transition-colors duration-200 gap-4">
+      {/* Identity — same mark, name and attribution as every other console. */}
+      <BrandMark section="Tracking" className="pr-2" />
+
       {/* Left side: Mode & Station Coordinates */}
       <div className="flex flex-wrap items-center gap-6">
         {/* Mode Selector */}
@@ -115,9 +120,7 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2 border-l-[max(1px,0.0625rem)] border-da-border pl-4 h-8">
-          <div className="h-7 w-7 rounded-full bg-da-info/10 border-[max(1px,0.0625rem)] border-da-info/20 flex items-center justify-center text-da-info hover:bg-da-info hover:text-white transition-all cursor-pointer overflow-hidden ml-1">
-            <User className="h-4 w-4" />
-          </div>
+          <OperatorChip />
         </div>
       </div>
     </header>

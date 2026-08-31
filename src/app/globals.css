@@ -82,6 +82,14 @@
   /* The capacity ring is a lighter, more teal green than the success token
      used for text and ticks — sampled at #66d2a1 off the design. */
   --color-da-gauge: #34d399;
+  /* Distinct from both the neutral "nominal" grey (da-label) and the amber/red
+     alarm hues — "no data" must never be mistaken for "healthy" or "faulted". */
+  --color-da-offline: #5b7a9e;
+  /* The dome viewport's own backdrop — deliberately NOT the same value in
+     light and dark (a forced-dark canvas read as flat pasted-on-top of a
+     light board). Both carry a faint green cast, radar/night-vision
+     instrument styling, distinct from the board's blue-grey chrome. */
+  --color-da-dome-viewport: #eef2ec;
 
   /* ---- chart series, in the design's legend order ----
      c1 Telemetry · c2 Waveform · c3 Scheduler · c4 System
@@ -183,6 +191,8 @@
     --color-da-info: #60a5fa;
     --color-da-info-soft: rgba(96, 165, 250, 0.13);
     --color-da-gauge: #2dd4bf;
+    --color-da-offline: #7c98b8;
+    --color-da-dome-viewport: #0a1512;
 
     /* ---- chart series, re-picked for a dark ground ---- */
     --color-da-c1: #2dd4bf;
@@ -243,6 +253,8 @@
   --color-da-info: #60a5fa;
   --color-da-info-soft: rgba(96, 165, 250, 0.13);
   --color-da-gauge: #2dd4bf;
+  --color-da-offline: #7c98b8;
+  --color-da-dome-viewport: #0a1512;
 
   /* ---- chart series, re-picked for a dark ground ---- */
   --color-da-c1: #2dd4bf;

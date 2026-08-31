@@ -1,12 +1,13 @@
 "use client";
 
-import { Archive, ChevronDown, Clock, Database, HardDrive, ListChecks, Settings, TriangleAlert } from "lucide-react";
+import { Clock, Database, HardDrive, ListChecks, Settings, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { archivalConfig } from "../../config";
 import { useDemoClock } from "../../hooks/useDemoClock";
 import { cn } from "../../lib/cn";
 import { formatClock, formatDate, formatRelative, formatTB } from "../../lib/format";
 import { SEED_HEALTH, SEED_STORAGE } from "../../data/seed";
+import { BrandMark } from "@/features/shell/BrandMark";
+import { OperatorChip } from "@/features/shell/OperatorChip";
 
 /**
  * A single status readout in the header rail: icon tile, caption, value, and an
@@ -78,22 +79,7 @@ export function AppHeader() {
 
   return (
     <header className="flex h-[4rem] shrink-0 items-center gap-[0.5rem] border-b-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem]">
-      {/* Wordmark */}
-      <div className="flex shrink-0 items-center gap-[0.5rem] pr-[0.375rem]">
-        {/* Solid cobalt in light; the dark comp tints the tile instead, so the
-            glyph carries the accent and the glow drops away. */}
-        <span className="flex size-[2rem] items-center justify-center rounded-[0.375rem] bg-da-brand text-da-on-brand shadow-[var(--shadow-da-brand-lg)] dark:bg-da-brand-soft dark:text-da-brand dark:shadow-none">
-          <Archive className="size-[1.0625rem]" strokeWidth={2} />
-        </span>
-        <span className="flex flex-col leading-none">
-          <span className="text-md font-bold tracking-[-0.01em] text-da-text">
-            {archivalConfig.brand.title}
-          </span>
-          <span className="mt-[0.1875rem] text-3xs font-medium text-da-muted">
-            {archivalConfig.brand.subtitle}
-          </span>
-        </span>
-      </div>
+      <BrandMark section="Archival" className="pr-[0.375rem]" />
 
       {/* Status rail */}
       <div className="flex min-w-0 flex-1 items-center gap-[0.4375rem]">
@@ -140,6 +126,7 @@ export function AppHeader() {
 
       {/* Operator block */}
       <div className="flex shrink-0 items-center gap-[0.625rem]">
+        <OperatorChip />
         <div className="flex flex-col items-end leading-none">
           <span className="da-nums text-md font-bold tracking-[-0.01em] text-da-text">
             {formatClock(now)}
@@ -149,23 +136,6 @@ export function AppHeader() {
           </span>
         </div>
 
-        <button
-          type="button"
-          className="flex cursor-pointer items-center gap-[0.375rem] rounded-[0.25rem] py-[0.1875rem] pl-[0.1875rem] pr-[0.25rem] transition-colors hover:bg-da-subtle"
-        >
-          {/* Same story as the wordmark tile: a filled disc in light, a quiet
-              tinted one on the dark board. */}
-          <span className="flex size-[1.5rem] items-center justify-center rounded-full bg-da-brand text-[0.5625rem] font-bold text-da-on-brand dark:bg-da-subtle dark:text-da-text dark:ring-[max(1px,0.0625rem)] dark:ring-da-border">
-            AD
-          </span>
-          <span className="flex flex-col items-start leading-none">
-            <span className="text-3xs font-bold uppercase tracking-[0.05em] text-da-text">
-              Admin
-            </span>
-            <span className="mt-[0.125rem] text-3xs font-medium text-da-muted">Operator</span>
-          </span>
-          <ChevronDown className="size-[0.6875rem] text-da-label" strokeWidth={2.4} />
-        </button>
       </div>
     </header>
   );
