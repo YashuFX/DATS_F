@@ -22,9 +22,20 @@ import { useDragThreshold } from "../hooks/useDragThreshold";
 export function FaceShell({
   face,
   isAbsent,
+  showHoverTag = true,
 }: {
   face: Face;
   isAbsent?: boolean;
+  /**
+   * Draw the hover readout as a tag pinned to the face.
+   *
+   * True on the full /dome screen, where a small floating tag beside the face
+   * costs nothing. False where the viewport is a panel and the tag would cover
+   * a meaningful share of the very dome it is annotating — there the host
+   * renders the same information in a fixed corner instead, reading
+   * `hoveredFace` from the store.
+   */
+  showHoverTag?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const edgeRef = useRef<THREE.LineSegments>(null);
@@ -142,7 +153,7 @@ export function FaceShell({
 
       {/* Hover = identify only, capped at 3 lines. Click still commits the
           selection — hovering never does. */}
-      {isHovered && !isAbsent && faceTelemetry && (
+      {showHoverTag && isHovered && !isAbsent && faceTelemetry && (
         <Html
           position={[
             face.centroid[0] + face.normal[0] * 0.15,

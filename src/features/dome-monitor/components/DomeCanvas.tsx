@@ -85,10 +85,14 @@ class WebGLErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
 export function DomeCanvas({
   manualPreset,
   viewMode = "3d",
+  showHoverTag = true,
 }: {
   /** Preset used when nothing is selected — a face selection overrides this internally (see DomeScene). */
   manualPreset: CameraPreset;
   viewMode?: "3d" | "net";
+  /** Draw hover readouts as tags on the faces. Off for small embeds, which
+   *  render the same information in a fixed corner instead. */
+  showHoverTag?: boolean;
 }) {
   const [webGLOk, setWebGLOk] = useState<boolean>(detectWebGL);
 
@@ -170,7 +174,7 @@ export function DomeCanvas({
             gl.setClearColor(0x000000, 0);
           }}
         >
-          <DomeScene manualPreset={manualPreset} />
+          <DomeScene manualPreset={manualPreset} showHoverTag={showHoverTag} />
         </Canvas>
       </div>
     </WebGLErrorBoundary>

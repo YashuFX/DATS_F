@@ -4,7 +4,6 @@ import { Sliders } from "lucide-react";
 import { MetricModeSelect } from "./MetricModeSelect";
 import { CameraPresets } from "./CameraPresets";
 import { OrbitPuck } from "./OrbitPuck";
-import { ViewActions } from "./ViewActions";
 import type { CameraPreset, MetricMode } from "../types";
 
 /**
@@ -43,15 +42,13 @@ export function ViewportHud({
           beside the camera presets on the right, because the detail panel
           (z-20) overlays the right half and would hide it exactly while a
           face is selected. See the comment in OrbitPuck.tsx. */}
+      {/* The round action rail (hold feed / snapshot / copy link) that used
+          to sit beside the puck has been removed. Its store state
+          (feedPaused, snapshotRequest) and the consumers in
+          useMockTelemetryFeed and DomeScene are still wired up but now have
+          no trigger — see domeStore.ts. */}
       <div className="flex flex-col items-start gap-[0.5rem]">
-        {/* Continuous control and discrete controls, bottom-aligned so they
-            read as one cluster rather than two floating pills. */}
-        {show3dControls && (
-          <div className="flex items-end gap-[0.5rem]">
-            <OrbitPuck />
-            <ViewActions />
-          </div>
-        )}
+        {show3dControls && <OrbitPuck />}
 
         <div className="pointer-events-auto flex items-center gap-[0.625rem] rounded-[0.375rem] border-[max(1px,0.0625rem)] border-da-border bg-da-chrome/85 px-[0.625rem] py-[0.5rem] shadow-da-card backdrop-blur-[0.5rem]">
           <span className="flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.08em] text-da-muted">

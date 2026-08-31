@@ -2,6 +2,7 @@ import {
   Archive,
   CalendarClock,
   Crosshair,
+  Gauge,
   Hexagon,
   LayoutGrid,
   Settings,
@@ -29,11 +30,19 @@ export interface Section {
 export const SECTIONS: Section[] = [
   {
     id: "dashboard",
-    label: "3D Dome",
+    label: "M&C",
     href: "/dashboard",
     match: "/dashboard",
+    icon: Gauge,
+    blurb: "Monitoring and controlling — tracking, health and schedule at a glance",
+  },
+  {
+    id: "dome",
+    label: "3D Dome",
+    href: "/dome",
+    match: "/dome",
     icon: Hexagon,
-    blurb: "3D operational dashboard for geodesic dome array",
+    blurb: "Interactive 3D model of the geodesic dome array",
   },
   {
     id: "monitoring",

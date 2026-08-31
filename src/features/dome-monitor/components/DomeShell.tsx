@@ -8,6 +8,8 @@ import { STALE_THRESHOLD_MS } from "../lib/readiness";
 import { deriveAlarms } from "../lib/alarms";
 import { THRESHOLDS } from "../config";
 import { useNow } from "../hooks/useNow";
+import { BrandMark } from "@/features/shell/BrandMark";
+import { OperatorChip } from "@/features/shell/OperatorChip";
 
 /**
  * Label-over-value header stat — the header's own version of a KPI tile.
@@ -102,19 +104,7 @@ export function DomeShell({ children }: { children: ReactNode }) {
       {/* One header — everything the old KPI strip showed now lives here as
           a stat group, so the board has a single top bar, not two. */}
       <header className="relative z-30 flex h-[4rem] shrink-0 items-center justify-between gap-[1rem] border-b-[max(1px,0.0625rem)] border-da-border bg-da-chrome/85 px-[0.875rem] backdrop-blur-[0.625rem]">
-        <div className="flex shrink-0 items-center gap-[0.5rem]">
-          <span className="flex size-[2rem] items-center justify-center rounded-[0.375rem] bg-da-brand text-da-on-brand shadow-da-brand-lg">
-            <Hexagon className="size-[1.0625rem]" strokeWidth={2} />
-          </span>
-          <span className="flex flex-col leading-none">
-            <span className="text-md font-bold tracking-[-0.01em] text-da-text">
-              DOME ARRAY
-            </span>
-            <span className="mt-[0.1875rem] text-3xs font-medium text-da-muted">
-              MUST-01 · Geodesic Phased Array
-            </span>
-          </span>
-        </div>
+        <BrandMark section="3D Dome" />
 
         {/* Three stat groups and a clock, hairline-separated.
             APERTURE (how much of the array is radiating) - FAULTS (what is
@@ -184,6 +174,8 @@ export function DomeShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-[0.625rem]">
+          <OperatorChip />
+
           {/* Alarms bell — opens the same sliding panel the face selection uses. */}
           <button
             type="button"

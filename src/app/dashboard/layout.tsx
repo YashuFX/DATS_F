@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import { AuthGuard } from "@/features/auth";
-import { DomeShell } from "@/features/dome-monitor";
+import { McShell } from "@/features/mnc";
 
 export const metadata: Metadata = {
-  title: "Dome Array — DATS",
-  description: "3D operational dashboard for the Must_cord.xlsx geodesic antenna array.",
+  title: "Monitoring & Controlling — DATS",
+  description:
+    "Single-screen operator console: live tracking, array health, schedule and antenna parameters.",
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      <DomeShell>{children}</DomeShell>
+      <McShell>{children}</McShell>
     </AuthGuard>
   );
 }

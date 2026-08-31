@@ -12,6 +12,7 @@ import { MOCK_TELEMETRY } from "../data/telemetry.mock";
 import { clampOrbitElevation } from "../lib/cameraFraming";
 import {
   CAMERA_DEFAULT_DISTANCE,
+  DEFAULT_SELECTED_FACE,
   CAMERA_PRESETS,
   ELEMENT_VISIBILITY_SHOW_DISTANCE,
   ELEMENT_VISIBILITY_HIDE_DISTANCE,
@@ -138,7 +139,7 @@ export interface DomeState {
 }
 
 export const useDomeStore = create<DomeState>((set) => ({
-  selection: { level: "array" },
+  selection: { level: "face", faceNum: DEFAULT_SELECTED_FACE },
   hoveredFace: null,
   metricMode: "states",
   telemetry: MOCK_TELEMETRY,

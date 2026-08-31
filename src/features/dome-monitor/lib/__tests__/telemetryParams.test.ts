@@ -27,7 +27,7 @@ import { deriveAlarms } from "../alarms";
 import { computeReadiness } from "../readiness";
 import { domeAverages } from "../faceStats";
 import { PRESENT_FACES } from "../../data/geometry";
-import { THRESHOLDS, TOTAL_ELEMENT_COUNT } from "../../config";
+import { DEFAULT_SELECTED_FACE, PRESENT_FACE_NUMS, THRESHOLDS, TOTAL_ELEMENT_COUNT } from "../../config";
 
 const telemetry = buildMockTelemetry();
 const faces = PRESENT_FACES.map((f) => telemetry.faces[f.fceNum]);
@@ -149,5 +149,18 @@ describe("headline stats are honest", () => {
         assert.ok(el.phase > -181 && el.phase <= 180, `Face ${ft.fceNum}: phase ${el.phase}° is unwrapped`);
       }
     }
+  });
+});
+
+describe("default selection", () => {
+  test("DEFAULT_SELECTED_FACE is a face that actually carries data", () => {
+    // The 6 foot faces are absent from Must_cord.xlsx. Defaulting to one would
+    // open the console on a face with no telemetry and no elements to draw.
+    const present: readonly number[] = PRESENT_FACE_NUMS;
+    assert.ok(
+      present.includes(DEFAULT_SELECTED_FACE),
+      `face ${DEFAULT_SELECTED_FACE} is not in PRESENT_FACE_NUMS`,
+    );
+    assert.ok(telemetry.faces[DEFAULT_SELECTED_FACE], "default face has no telemetry");
   });
 });

@@ -40,9 +40,12 @@ function prefersReducedMotion(): boolean {
  */
 export function DomeScene({
   manualPreset,
+  showHoverTag = true,
 }: {
   /** Preset used when nothing is selected. */
   manualPreset: CameraPreset;
+  /** Forwarded to every FaceShell — see the note there. */
+  showHoverTag?: boolean;
 }) {
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const { camera, invalidate, size, gl, scene } = useThree();
@@ -408,7 +411,7 @@ export function DomeScene({
       {/* Present faces — full shells + elements */}
       {PRESENT_FACES.map((face) => (
         <group key={face.fceNum}>
-          <FaceShell face={face} />
+          <FaceShell face={face} showHoverTag={showHoverTag} />
           <ElementLayer face={face} />
           <FaceStatusTexture face={face} />
         </group>

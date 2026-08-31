@@ -1,12 +1,14 @@
 "use client";
 
-import { ArrowLeft, Radar, TriangleAlert } from "lucide-react";
+import { ArrowLeft, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { ARRAY_TOTALS } from "../data/tiles";
 import { siteAlarms } from "../data/infrastructure";
+import { BrandMark } from "@/features/shell/BrandMark";
+import { OperatorChip } from "@/features/shell/OperatorChip";
 
 /**
  * Chrome for every /monitor screen: wordmark rail on top, content in the full
@@ -25,21 +27,10 @@ export function MonitorShell({ children }: { children: ReactNode }) {
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-da-bg text-da-text">
       {/* Wordmark rail */}
       <header className="flex h-[4rem] shrink-0 items-center justify-between border-b-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem]">
-        <div className="flex items-center gap-[0.5rem]">
-          <span className="flex size-[2rem] items-center justify-center rounded-[0.375rem] bg-da-brand text-da-on-brand shadow-da-brand-lg">
-            <Radar className="size-[1.0625rem]" strokeWidth={2} />
-          </span>
-          <span className="flex flex-col leading-none">
-            <span className="text-md font-bold tracking-[-0.01em] text-da-text">
-              ARRAY MONITOR
-            </span>
-            <span className="mt-[0.1875rem] text-3xs font-medium text-da-muted">
-              DATS-09 · 24×24 S-Band Aperture
-            </span>
-          </span>
-        </div>
+        <BrandMark section="Array Monitor" />
 
         <div className="flex items-center gap-[0.875rem]">
+          <OperatorChip />
           {!isArrayHome && (
             <Link
               href="/monitor/array"

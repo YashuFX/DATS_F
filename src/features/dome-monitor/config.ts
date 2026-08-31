@@ -35,6 +35,22 @@ export const CAMERA_TRANSITION_MS = 450;
 export const ELEMENT_VISIBILITY_SHOW_DISTANCE = 13;
 export const ELEMENT_VISIBILITY_HIDE_DISTANCE = 15;
 
+/**
+ * Face selected when the console opens with nothing in the URL.
+ *
+ * The board is more useful with a face already in hand than empty: the M&C
+ * Health Overview's element grid and the Health Preview's parameter table are
+ * both scoped to a selection, so an unselected default greets the operator
+ * with two panels asking them to pick something before either says anything.
+ *
+ * `?face=` still wins — the URL is hydrated after the store is constructed
+ * (useSelectionUrlSync), so a shared link or a reload lands where it should
+ * and this only fills the gap when there is no instruction.
+ *
+ * Must be a member of PRESENT_FACE_NUMS; the 6 foot faces carry no data.
+ */
+export const DEFAULT_SELECTED_FACE = 8;
+
 /** Framing distance used when a face is selected — close enough to read the
  *  selected face clearly, far enough that the whole dome silhouette (not
  *  just one face filling the frame) still fits in the left half. */

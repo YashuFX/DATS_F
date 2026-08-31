@@ -6,6 +6,8 @@ import { cn } from "@/features/data-archival/lib/cn";
 import { loadedConflicts } from "../lib/live";
 import { useSimStore } from "../store/simStore";
 import { SchedulerRuntime } from "./SchedulerRuntime";
+import { BrandMark } from "@/features/shell/BrandMark";
+import { OperatorChip } from "@/features/shell/OperatorChip";
 
 /**
  * Chrome for the scheduler section.
@@ -46,21 +48,10 @@ export function SchedulerShell({ children }: { children: ReactNode }) {
       <SchedulerRuntime />
 
       <header className="flex h-[4rem] shrink-0 items-center justify-between border-b-[max(1px,0.0625rem)] border-da-border bg-da-chrome px-[0.875rem]">
-        <div className="flex items-center gap-[0.5rem]">
-          <span className="flex size-[2rem] items-center justify-center rounded-[0.375rem] bg-da-brand text-da-on-brand shadow-da-brand-lg">
-            <Satellite className="size-[1.0625rem]" strokeWidth={2} />
-          </span>
-          <span className="flex flex-col leading-none">
-            <span className="text-md font-bold tracking-[-0.01em] text-da-text">
-              MULTI-SATELLITE SCHEDULER
-            </span>
-            <span className="mt-[0.1875rem] text-3xs font-medium text-da-muted">
-              Telemetry &amp; tracking · pass prediction from TLE
-            </span>
-          </span>
-        </div>
+        <BrandMark section="Scheduler" />
 
         <div className="flex items-center gap-[0.875rem]">
+          <OperatorChip />
           <span
             className="flex items-center gap-[0.375rem] rounded-[0.25rem] border-[max(1px,0.0625rem)] px-[0.5rem] py-[0.25rem]"
             style={{
