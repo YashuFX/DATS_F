@@ -99,10 +99,14 @@ export function HealthOverviewPanel({ className }: { className?: string }) {
         </div>
       }
     >
-      <Legend />
 
       {mode === "3d" ? (
         <>
+          {/* Only the dome needs a floating legend. The POC view prints the
+              same four states with their counts under the aperture, and two
+              legends on one panel is one too many. */}
+          <Legend />
+
           <div className="min-h-0 flex-1" style={{ backgroundColor: "var(--color-da-dome-viewport)" }}>
             <DomeCanvas manualPreset={CAMERA_PRESETS[0]} viewMode="3d" showHoverTag={false} />
           </div>
