@@ -122,6 +122,10 @@
   --shadow-da-card: 0 1px 2px rgba(16, 24, 40, 0.04);
   --shadow-da-brand: 0 1px 2px rgba(0, 101, 253, 0.24);
   --shadow-da-brand-lg: 0 2px 6px rgba(0, 101, 253, 0.3);
+  /* The one lift in the system authored in rem rather than px: a panel
+     expanded over the board carries it at 4K too, where a 24px spread is a
+     hairline. Cards keep px because theirs is a hairline by intent. */
+  --shadow-da-overlay: 0 1.5rem 3rem rgba(16, 24, 40, 0.22), 0 0.25rem 0.75rem rgba(16, 24, 40, 0.12);
 
   /* ---- dense dashboard type ramp (rem === scales to 4K) ---- */
   --text-3xs: 0.5625rem;   /* 9px  */
@@ -231,6 +235,10 @@
     --shadow-da-card: none;
     --shadow-da-brand: 0 1px 2px rgba(45, 212, 191, 0.16);
     --shadow-da-brand-lg: 0 2px 10px rgba(45, 212, 191, 0.14);
+    /* The exception to the rule above: an expanded panel is the one surface
+       that has to separate from a board it is floating over rather than
+       sitting in, and the surface step alone cannot say that. */
+    --shadow-da-overlay: 0 1.5rem 3rem rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -295,6 +303,7 @@
   --shadow-da-card: none;
   --shadow-da-brand: 0 1px 2px rgba(45, 212, 191, 0.16);
   --shadow-da-brand-lg: 0 2px 10px rgba(45, 212, 191, 0.14);
+  --shadow-da-overlay: 0 1.5rem 3rem rgba(0, 0, 0, 0.55);
 }
 
 /* An explicit light choice on a dark-preferring OS. */
@@ -535,4 +544,63 @@
     0 1px 2px rgba(16, 24, 40, 0.04),
     0 12px 32px -12px rgba(16, 24, 40, 0.18);
   backdrop-filter: blur(0.75rem);
+}
+
+/* ============================================================================
+   M&C PANELS — expand in place
+
+   A board panel expands by going `fixed` where it stands rather than by
+   re-rendering somewhere else. That is the whole reason the geometry lives
+   here instead of in a modal component: the tracking panel holds a live Cesium
+   viewer and a running propagator, and re-parenting that subtree to open it
+   larger would drop the globe back to its loading spinner every single time.
+   Moving the box leaves the tree untouched.
+
+   Coverage arrives as a bare number in `--da-panel-expand`, written by the
+   panel from Settings → Console → Panels, so one rule serves every step from
+   60% to 98% without a class per value.
+
+   Below 40rem the overlay takes the viewport whole. 85% of a 360-wide phone is
+   not a bigger panel — it is the same panel with a frame drawn around it.
+   ========================================================================== */
+.da-panel-expanded {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  z-index: 51;
+  width: calc(100vw - 1rem);
+  height: calc(100dvh - 1rem);
+  /* Read here rather than through Tailwind's `shadow-*` utility, which
+     resolves a theme value at build time and would weld the light lift onto
+     the dark board. */
+  box-shadow: var(--shadow-da-overlay);
+  animation: da-panel-expand 140ms ease-out;
+}
+
+@media (min-width: 40rem) {
+  .da-panel-expanded {
+    width: min(calc(var(--da-panel-expand, 85) * 1vw), calc(100vw - 2rem));
+    height: min(calc(var(--da-panel-expand, 85) * 1dvh), calc(100dvh - 2rem));
+  }
+}
+
+.da-panel-backdrop {
+  animation: da-panel-backdrop-in 140ms ease-out;
+}
+
+/* Scaled from just under full size rather than from nothing: the panel is the
+   same panel the operator just clicked, and a grow-from-zero would read as a
+   different object arriving. */
+@keyframes da-panel-expand {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+
+@keyframes da-panel-backdrop-in {
+  from {
+    opacity: 0;
+  }
 }

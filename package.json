@@ -3,15 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/copy-cesium.mjs && next dev",
-    "build": "node scripts/copy-cesium.mjs && next build",
+    "dev": "node scripts/copy-cesium.mjs && node scripts/make-satellite-model.mjs && next dev",
+    "build": "node scripts/copy-cesium.mjs && node scripts/make-satellite-model.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "test:geometry": "node --import ./scripts/register-test-hooks.mjs --test --experimental-strip-types \"src/features/dome-monitor/lib/__tests__/*.test.ts\"",
-    "test": "npm run test:geometry",
+    "test": "npm run test:geometry && npm run test:sim",
     "validate:geometry": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-test-hooks.mjs --experimental-strip-types scripts/validate-dome-geometry.ts",
     "copy:cesium": "node scripts/copy-cesium.mjs",
-    "postinstall": "node scripts/copy-cesium.mjs"
+    "build:models": "node scripts/make-satellite-model.mjs",
+    "postinstall": "node scripts/copy-cesium.mjs && node scripts/make-satellite-model.mjs",
+    "test:sim": "node --import ./scripts/register-test-hooks.mjs --test --experimental-strip-types \"src/features/mnc/sim/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
@@ -23,6 +25,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resium": "^1.25.0",
+    "satellite.js": "^5.0.0",
     "three": "^0.184.0",
     "zustand": "^5.0.15"
   },

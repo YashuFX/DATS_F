@@ -36,32 +36,121 @@ export const SITE = {
 } as const;
 
 /**
- * Antenna pointing envelope — what the dish can see from this site.
+ * The station's tracking volume, and what limits it.
  *
- * A STATIC rectangular pyramid rising from the station: apex at the antenna,
- * axis along the local vertical, `halfWidthDeg` either side of that axis in
- * azimuth AND in elevation, reaching `rangeKm`.
+ * MUST-01 is a geodesic dome, and hemispherical coverage is the entire reason
+ * it is one: a planar array is limited to roughly ±60° off its own boresight
+ * before scan loss and grating lobes end the useful pattern, so covering the
+ * sky with one flat face is impossible. Twenty-six faces pointing in different
+ * directions cover azimuth 0-360° and elevation 0-90° between them, and any
+ * given target is served by whichever face it happens to sit in front of.
  *
- * Square, not circular. A ±30° / ±30° limit is two independent axis limits, so
- * its cross-section is a square of half-width `range · tan(30°)` — a cone
- * would be the envelope of a single ±30° limit measured in every direction at
- * once, which is a different and strictly smaller volume. The corners are the
- * difference: a target 30° off in azimuth AND 30° off in elevation is inside
- * these limits but ~39° off-axis, so a cone would wrongly report it out.
- *
- * Centred on zenith rather than on a commanded boresight, because the fence is
- * a fixed property of the installation — the limit the mount was built with —
- * not a readout that swings with whatever the antenna happens to be tracking.
- * Centring it on the live boresight would have made it move under the passes
- * it is supposed to be judging, which is exactly backwards.
+ * That is why the volume below is a hemisphere rather than the ±30° pyramid
+ * this once drew. The ±30° figure was never the DOME's limit; it is a single
+ * FACE's scan limit, and it survives as `faceScanLimitDeg` — the test for
+ * whether a particular face can serve a particular target.
  */
-export const ANTENNA_FENCE = {
-  /** Half-width from the vertical axis, degrees — applied in azimuth and in
-   *  elevation independently, which is what makes the envelope square. */
-  halfWidthDeg: 30,
-  /** Range the fence is drawn to along its axis, km. */
-  rangeKm: 800,
+export const TRACKING = {
+  /** Lowest elevation the station will track to, degrees. Below this the path
+   *  through the atmosphere is long enough that the link budget stops closing. */
+  elevationMaskDeg: 5,
+  /** Farthest slant range tracked, km. */
+  maxRangeKm: 4000,
+  /** Half-angle a single face can steer off its own boresight, degrees. */
+  faceScanLimitDeg: 30,
 } as const;
+
+/**
+ * Beam budget.
+ *
+ * A tracked target costs SIX beams: a five-beam monopulse cluster — one on
+ * boresight and four squinted off it — whose amplitude differences give the
+ * angle error that keeps the pointing loop closed, plus one data beam
+ * carrying the downlink. That is the arrangement a real tracking array uses,
+ * and it is the reason "how many satellites can we track" is not the same
+ * question as "how many can we see".
+ *
+ * `beamsPerFace` is the digital beamformer's channel count on each face —
+ * the hard limit, since forming a beam costs a receiver chain whether or not
+ * the aperture could geometrically support another.
+ */
+export const BEAMS = {
+  trackingBeamsPerTarget: 5,
+  dataBeamsPerTarget: 1,
+  beamsPerFace: 16,
+  /**
+   * Half-power beamwidth of one beam, degrees — the full cone, not the half.
+   *
+   * This is the number an antenna engineer quotes, so it is the one stated
+   * here; everything angular below is DERIVED from it rather than tuned
+   * beside it. The three constants used to be independent literals that had
+   * to be kept in a fixed ratio by hand, which is a standing invitation to
+   * move one and silently open a gap in the cluster.
+   */
+  beamwidthDeg: 4.5,
+  /**
+   * Relative excitation weight of each beam in the six-beam cluster.
+   *
+   * A cluster is not six equal beams. Forming a beam spends a share of the
+   * face's finite receive aperture, and the three roles want different
+   * shares:
+   *
+   *   DATA       the largest. Downlink rate scales with G/T, so the beam
+   *              carrying the payload data is the one worth spending on.
+   *   SUM        the boresight reference — tracking AND ranging come off it,
+   *              so it needs enough gain to hold a lock on its own.
+   *   DIFFERENCE the four squinted error channels. They only have to measure
+   *              an IMBALANCE, and the null they work at is deep, so they
+   *              close their loop on materially less gain than the sum beam.
+   *
+   * Relative, not absolute: what matters is the ratio between them. The
+   * normalised share of the target's allocation is derived in
+   * `beamDirections`, so these can be retuned without touching any consumer.
+   */
+  weights: {
+    sum: 1,
+    difference: 0.55,
+    data: 1.2,
+  },
+} as const;
+
+/**
+ * Half-width of one beam's footprint, degrees.
+ *
+ * ---- why the angular constants are one design, not three knobs ----
+ *
+ * The reason a target costs five tracking beams instead of one:
+ *
+ *   the array is steered to a PREDICTED direction and holds it;
+ *   the spacecraft drifts off that direction by up to `repointDeg`;
+ *   wherever inside that circle it ends up, some beam must still hold it.
+ *
+ * Five beams spaced `monopulseSquintDeg` apart in a plus pattern only cover
+ * that circle without a gap if their footprints OVERLAP. Tangent footprints
+ * leave the diagonals uncovered: a target that has drifted `q` at 45° is
+ * 0.77q from the nearest beam centre, well outside a footprint of q/2, and
+ * the contact would be dropped in the one direction nobody checks.
+ *
+ * So the squint is derived from the beamwidth at the ratio that closes the
+ * diagonal — three quarters of a squint per half-width — which also puts the
+ * beam crossovers near the half-power contour, where a real monopulse cluster
+ * is designed to cross. Changing `beamwidthDeg` alone now rescales the whole
+ * cluster and keeps the covering property; it cannot be half-changed.
+ *
+ * `npm test` asserts that property rather than these numbers, so the design
+ * can be retuned without the test having to be rewritten around it.
+ */
+export const BEAM_HALF_WIDTH_DEG = BEAMS.beamwidthDeg / 2;
+
+/** Angular offset of the four squinted monopulse beams, degrees. */
+export const MONOPULSE_SQUINT_DEG = BEAM_HALF_WIDTH_DEG / 0.75;
+
+/** How far the target may drift off the commanded direction before the array
+ *  re-steers, degrees. Exactly one footprint half-width: past that, the beam
+ *  holding the target is no longer the one it was handed to. */
+export const REPOINT_DEG = BEAM_HALF_WIDTH_DEG;
+
+export const BEAMS_PER_TARGET = BEAMS.trackingBeamsPerTarget + BEAMS.dataBeamsPerTarget;
 
 export const GROUND_STATIONS: GroundStationMarker[] = [
   { id: SITE.id, name: SITE.name, latDeg: SITE.latDeg, lonDeg: SITE.lonDeg },

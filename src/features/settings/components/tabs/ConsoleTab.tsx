@@ -1,11 +1,11 @@
 "use client";
 
-import { Clock, Compass, LayoutGrid, Table2 } from "lucide-react";
+import { Clock, Compass, LayoutGrid, Maximize2, Table2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SECTIONS } from "@/features/shell/sections";
 import { useSettingsStore } from "../../store/settingsStore";
-import { TIME_ZONES } from "../../types";
+import { PANEL_BACKDROPS, PANEL_EXPAND_MODES, TIME_ZONES } from "../../types";
 import {
   Field,
   Note,
@@ -163,6 +163,68 @@ export function ConsoleTab() {
                 format={(v) => `${v}`}
               />
             </Field>
+          )}
+        </Panel>
+
+        <Panel
+          title="Panels"
+          icon={Maximize2}
+          description="What the expand control on a board panel does — on the M&C board, and anywhere else panels carry one."
+        >
+          <Field
+            label="Expand control"
+            hint="Expanding in place keeps the board, the running simulation and the globe exactly as they were; opening the full page navigates to the section's own screen."
+          >
+            <Segmented
+              value={settings.panelExpand}
+              onValue={(v) => update({ panelExpand: v })}
+              options={PANEL_EXPAND_MODES.map((m) => ({
+                value: m.id,
+                label: m.label,
+              }))}
+            />
+          </Field>
+
+          {settings.panelExpand === "overlay" ? (
+            <>
+              <Field
+                label="Screen coverage"
+                hint="How much of the viewport an expanded panel takes. Phones ignore this and use the whole screen — a fraction of a phone is not a bigger panel."
+              >
+                <Slider
+                  value={settings.panelOverlaySize}
+                  onValue={(v) => update({ panelOverlaySize: v })}
+                  min={60}
+                  max={98}
+                  step={1}
+                  format={(v) => `${v}%`}
+                />
+              </Field>
+
+              <Field label="Board behind it">
+                <Segmented
+                  value={settings.panelOverlayBackdrop}
+                  onValue={(v) => update({ panelOverlayBackdrop: v })}
+                  options={PANEL_BACKDROPS.map((b) => ({
+                    value: b.id,
+                    label: b.label,
+                  }))}
+                />
+              </Field>
+
+              <Toggle
+                label="Click outside to close"
+                hint="Escape and the panel's own Close always work, whichever way this sits."
+                checked={settings.panelOverlayDismiss}
+                onChange={(v) => update({ panelOverlayDismiss: v })}
+              />
+            </>
+          ) : (
+            <Note>
+              Each panel&rsquo;s expand control navigates to its own screen —
+              tracking, the 3D dome, the scheduler — and the browser&rsquo;s back
+              button returns to the board.
+            </Note>
           )}
         </Panel>
 

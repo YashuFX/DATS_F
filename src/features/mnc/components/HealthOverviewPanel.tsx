@@ -1,10 +1,22 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
-import { Hexagon } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Hexagon, RotateCcw } from "lucide-react";
 import { Panel } from "./Panel";
 import { FaceTileGrid } from "./FaceTileGrid";
+import { TileFooter } from "./TileFooter";
+import { useWebGLAvailable } from "../lib/useWebGLAvailable";
+
+/**
+ * The 3D tile is client-only WebGL, so it is dynamically imported the same way
+ * the dome is. Its loading state is the flat tile rather than a spinner —
+ * `buildFaceLattice` gives both renderers identical geometry, so the panel
+ * shows the right picture immediately and gains depth when the canvas lands.
+ */
+const FaceTile3D = dynamic(() => import("./FaceTile3D").then((m) => ({ default: m.FaceTile3D })), {
+  ssr: false,
+});
 import { HoverReadout } from "./HoverReadout";
 import { cn } from "@/features/data-archival/lib/cn";
 import { CAMERA_PRESETS } from "@/features/dome-monitor/config";
@@ -64,6 +76,13 @@ function Legend() {
 
 export function HealthOverviewPanel({ className }: { className?: string }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
+  // Bumped to ask the tile to ease back to face-on. A nonce rather than a
+  // boolean: pressing reset twice from two different angles must fire twice.
+  const [resetNonce, setResetNonce] = useState(0);
+  const resetTile = useCallback(() => setResetNonce((n) => n + 1), []);
+
+  // The 3D tile needs a WebGL context; the flat one does not.
+  const webgl = useWebGLAvailable();
   const selection = useDomeStore((s) => s.selection);
   const metricMode = useDomeStore((s) => s.metricMode);
   const setMetricMode = useDomeStore((s) => s.setMetricMode);
@@ -127,7 +146,7 @@ export function HealthOverviewPanel({ className }: { className?: string }) {
           </div>
         </>
       ) : (
-        <div className="min-h-0 flex-1 overflow-hidden p-[0.625rem]">
+        <div className="relative min-h-0 flex-1 overflow-hidden p-[0.625rem]">
           {faceNum === undefined ? (
             // No invented default. Showing face 2's grid while the dome has
             // nothing selected would read as "this is the array", and an
@@ -140,7 +159,31 @@ export function HealthOverviewPanel({ className }: { className?: string }) {
               </span>
             </div>
           ) : (
-            <FaceTileGrid faceNum={faceNum} />
+            <div className="flex h-full min-h-0 flex-col gap-[0.375rem]">
+              <div className="min-h-0 flex-1">
+                {/* Flat tile until the probe answers, and permanently if the
+                    answer is no: both renderers read the same lattice, so the
+                    fallback is the same tile without the depth, never a
+                    different picture or an error card. */}
+                {webgl ? (
+                  <FaceTile3D faceNum={faceNum} resetNonce={resetNonce} />
+                ) : (
+                  <FaceTileGrid faceNum={faceNum} />
+                )}
+              </div>
+              <TileFooter faceNum={faceNum} />
+              {webgl && (
+              <button
+                type="button"
+                onClick={resetTile}
+                aria-label="Reset tile orientation"
+                title="Reset tile orientation"
+                className="absolute top-[0.625rem] right-[0.625rem] z-10 flex size-[1.5rem] cursor-pointer items-center justify-center rounded-[0.25rem] border-[max(1px,0.0625rem)] border-da-border bg-da-chrome/85 text-da-muted backdrop-blur-[0.25rem] transition-colors hover:bg-da-subtle hover:text-da-text focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--color-da-brand)]"
+              >
+                <RotateCcw className="size-[0.75rem]" strokeWidth={2.2} />
+              </button>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -26,6 +26,9 @@ export type NotifyPosition =
   | "top-center";
 export type Severity = "info" | "success" | "warning" | "error";
 export type TableRows = "auto" | number;
+/** What a console panel's expand control does. */
+export type PanelExpandMode = "overlay" | "page";
+export type PanelBackdrop = "blur" | "dim" | "clear";
 
 export interface AppSettings {
   /* ── Appearance ─────────────────────────────────────────────────────── */
@@ -60,6 +63,13 @@ export interface AppSettings {
   clockTickMs: number;
   showSectionNav: boolean;
   homeHref: string;
+  /** Expand a board panel over the console, or navigate to its own screen. */
+  panelExpand: PanelExpandMode;
+  /** Share of the viewport an expanded panel covers, in per cent. */
+  panelOverlaySize: number;
+  panelOverlayBackdrop: PanelBackdrop;
+  /** Whether a click on the backdrop closes the expanded panel. */
+  panelOverlayDismiss: boolean;
 
   /* ── Data & storage ─────────────────────────────────────────────────── */
   defaultDataType: string;
@@ -121,6 +131,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   clockTickMs: 1000,
   showSectionNav: true,
   homeHref: "/monitor/array",
+  panelExpand: "overlay",
+  panelOverlaySize: 85,
+  panelOverlayBackdrop: "blur",
+  panelOverlayDismiss: true,
 
   defaultDataType: "telemetry",
   defaultPriority: "medium",
@@ -326,6 +340,17 @@ export const NOTIFY_POSITIONS: { id: NotifyPosition; label: string }[] = [
   { id: "top-right", label: "Top right" },
   { id: "top-left", label: "Top left" },
   { id: "top-center", label: "Top centre" },
+];
+
+export const PANEL_EXPAND_MODES: { id: PanelExpandMode; label: string }[] = [
+  { id: "overlay", label: "Expand in place" },
+  { id: "page", label: "Open full page" },
+];
+
+export const PANEL_BACKDROPS: { id: PanelBackdrop; label: string }[] = [
+  { id: "blur", label: "Dim + blur" },
+  { id: "dim", label: "Dim" },
+  { id: "clear", label: "Clear" },
 ];
 
 export const SETTINGS_STORAGE_KEY = "dats-settings";

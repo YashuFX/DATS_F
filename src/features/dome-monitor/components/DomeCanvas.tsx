@@ -5,34 +5,10 @@ import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { DomeScene } from "./DomeScene";
 import { CAMERA_BASE_FOV } from "../config";
+import { detectWebGL } from "../lib/detectWebGL";
 import { DomeNetView } from "./DomeNetView";
 import type { CameraPreset } from "../types";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-
-/**
- * Check whether a WebGL context (WebGL2 or WebGL1) can be created.
- *
- * Probes webgl2 first, then webgl1 / experimental-webgl.
- * The probe context is released immediately to avoid context leaks.
- */
-function detectWebGL(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = (canvas.getContext("webgl2") ??
-      canvas.getContext("webgl") ??
-      canvas.getContext("experimental-webgl")) as
-      | WebGL2RenderingContext
-      | WebGLRenderingContext
-      | null;
-
-    if (!gl) return false;
-    gl.getExtension("WEBGL_lose_context")?.loseContext();
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /** Does this failure look like the GPU/WebGL stack rather than scene code? */
 function isWebGLFailure(reason: unknown): boolean {

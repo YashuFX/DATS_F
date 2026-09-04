@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Play, Square } from "lucide-react";
 import { cn } from "@/features/data-archival/lib/cn";
+import { useSimStore } from "../sim/simStore";
 
 /**
  * One button, two states — start acquisition, then halt it.
@@ -12,20 +12,23 @@ import { cn } from "@/features/data-archival/lib/cn";
  * the console was actually in. A single toggle makes the state readable from
  * the control itself: green play means idle, red stop means running.
  *
- * Local state for now. Wiring this to real acquisition needs the command
- * contract (the console is monitor-only until confirmed — B4), so the button
- * deliberately does not pretend to command hardware it cannot reach.
+ * Drives the tracking SIMULATION, not hardware. Commanding the real aperture
+ * needs the command contract (the console is monitor-only until B4 confirms
+ * otherwise), so this starts and stops the propagator and the beam planner —
+ * which is what the label honestly describes today.
  */
 export function RunControl() {
-  const [running, setRunning] = useState(false);
+  const running = useSimStore((s) => s.running);
+  const start = useSimStore((s) => s.start);
+  const stop = useSimStore((s) => s.stop);
 
   return (
     <button
       type="button"
-      onClick={() => setRunning((r) => !r)}
+      onClick={() => (running ? stop() : start())}
       aria-pressed={running}
-      aria-label={running ? "Halt acquisition" : "Start acquisition"}
-      title={running ? "Halt acquisition" : "Start acquisition"}
+      aria-label={running ? "Stop tracking simulation" : "Start tracking simulation"}
+      title={running ? "Stop tracking simulation" : "Start tracking simulation"}
       className={cn(
         "ml-[0.25rem] flex size-[1.875rem] shrink-0 cursor-pointer items-center justify-center rounded-full text-white transition-colors",
         "focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2",

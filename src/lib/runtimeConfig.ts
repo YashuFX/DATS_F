@@ -30,6 +30,14 @@ export interface RuntimeConfig {
   showSectionNav: boolean;
   /** Records the pass archive keeps before dropping the oldest. */
   archiveCap: number;
+  /** What a board panel's expand control does — open it over the console, or navigate. */
+  panelExpand: "overlay" | "page";
+  /** Share of the viewport an expanded panel covers, in per cent. */
+  panelOverlaySize: number;
+  /** How the board behind an expanded panel is treated. */
+  panelOverlayBackdrop: "blur" | "dim" | "clear";
+  /** Whether a click on the backdrop closes the expanded panel. */
+  panelOverlayDismiss: boolean;
 }
 
 export const RUNTIME_DEFAULTS: RuntimeConfig = {
@@ -39,6 +47,10 @@ export const RUNTIME_DEFAULTS: RuntimeConfig = {
   stationName: "Bengaluru (ISTRAC)",
   showSectionNav: true,
   archiveCap: 500,
+  panelExpand: "overlay",
+  panelOverlaySize: 85,
+  panelOverlayBackdrop: "blur",
+  panelOverlayDismiss: true,
 };
 
 /* Replaced wholesale rather than mutated, so `useSyncExternalStore` can compare

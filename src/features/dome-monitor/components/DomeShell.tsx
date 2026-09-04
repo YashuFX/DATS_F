@@ -1,6 +1,6 @@
 "use client";
 
-import { Hexagon, Bell, Clock } from "lucide-react";
+import { Bell, Clock } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { cn } from "@/features/data-archival/lib/cn";
 import { useDomeStore } from "../store/domeStore";

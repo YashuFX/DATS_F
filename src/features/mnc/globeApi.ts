@@ -20,6 +20,10 @@ export interface GlobeApi {
   focusSite: () => void;
   /** Fly out until every tracked object is in frame. */
   fitAll: () => void;
+  /** Fly in on the active target, framed with a standoff. */
+  zoomToTarget: () => void;
+  /** Lock the camera onto the active target so it stays centred as it moves. */
+  setFollowTarget: (follow: boolean) => void;
   /** Show or hide the ±30° / 800 km pointing envelope. */
   setFenceVisible: (visible: boolean) => void;
   /** Show or hide entity labels. */

@@ -50,6 +50,10 @@ export function SettingsRuntime() {
         stationName: settings.stationName,
         archiveCap: settings.archiveCap,
         showSectionNav: settings.showSectionNav,
+        panelExpand: settings.panelExpand,
+        panelOverlaySize: settings.panelOverlaySize,
+        panelOverlayBackdrop: settings.panelOverlayBackdrop,
+        panelOverlayDismiss: settings.panelOverlayDismiss,
       });
     };
 

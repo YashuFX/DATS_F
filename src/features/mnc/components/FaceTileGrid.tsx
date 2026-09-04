@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { FACE_MAP, getTemplate } from "@/features/dome-monitor/data/geometry";
+import { FACE_MAP } from "@/features/dome-monitor/data/geometry";
+import { buildFaceLattice } from "../lib/faceLattice";
 import { useDomeStore } from "@/features/dome-monitor/store/domeStore";
 import { HEALTH_META, type HealthId } from "@/features/dome-monitor/types";
 
@@ -63,7 +64,12 @@ function hexPath(x: number, y: number, r: number): string {
 }
 
 /**
- * One face's aperture, drawn as the honeycomb it physically is.
+ * One face's aperture as a flat honeycomb — the 2D rendering of the POC tile,
+ * and the fallback the panel shows when WebGL is unavailable.
+ *
+ * Geometry comes from `buildFaceLattice`, the same function the 3D tile reads,
+ * so the two cannot drift apart: same sites, same pitch, same square carrier,
+ * same inert population. This file owns only the projection and the painting.
  *
  * The elements sit on a TRIANGULAR lattice — 0.1 m pitch, rows offset half a
  * pitch and spaced 0.0866 m (= pitch·√3/2). Every element's Voronoi cell is
@@ -93,132 +99,23 @@ export function FaceTileGrid({ faceNum }: { faceNum: number }) {
 
   const plot = useMemo(() => {
     if (!face || !ft) return null;
-    const template = getTemplate(face.kind);
+    const lattice = buildFaceLattice(face, ft);
 
-    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
-    for (const [u, v] of template) {
-      if (u < minU) minU = u;
-      if (u > maxU) maxU = u;
-      if (v < minV) minV = v;
-      if (v > maxV) maxV = v;
-    }
-    // One scale for both axes, or the lattice shears and the cells stop
-    // tessellating. The viewBox takes the face's real aspect instead.
-    const scale = SPAN / Math.max(maxU - minU || 1, maxV - minV || 1);
-
-    // Lattice pitch, measured rather than assumed: the pentagon and hexagon
-    // templates are spaced differently.
-    let pitchU = Infinity;
-    for (let i = 0; i < Math.min(template.length, 150); i++) {
-      for (let j = i + 1; j < template.length; j++) {
-        const d = Math.hypot(template[i][0] - template[j][0], template[i][1] - template[j][1]);
-        if (d > 1e-9 && d < pitchU) pitchU = d;
-      }
-    }
-    if (!Number.isFinite(pitchU)) pitchU = (maxU - minU) / 20;
-    const rowU = (pitchU * Math.sqrt(3)) / 2;
-
-    // Snap every element onto integer (row, col) of a triangular lattice.
-    // Hexagon faces land exactly; a pentagon's lattice is not this lattice, so
-    // the fit is checked rather than trusted — see `isLattice` below.
-    const key = (r: number, c: number) => `${r},${c}`;
-    const occupied = new Map<string, HealthId>();
-    let snapError = 0;
-    for (let i = 0; i < template.length; i++) {
-      const [u, v] = template[i];
-      const rf = (maxV - v) / rowU;
-      const r = Math.round(rf);
-      const off = r % 2 ? pitchU / 2 : 0;
-      const cf = (u - minU - off) / pitchU;
-      const c = Math.round(cf);
-      snapError = Math.max(snapError, Math.abs(rf - r), Math.abs(cf - c));
-      occupied.set(key(r, c), ft.elements[i]?.health ?? "offline");
-    }
-    const isLattice = snapError < 0.05 && occupied.size === template.length;
-
-    const points: Point[] = [];
-    if (isLattice) {
-      // Square carrier: extend the lattice out to a square centred on the
-      // aperture, so the panel reads as a panel and the hexagon reads as what
-      // is lit inside it.
-      const side = Math.max(maxU - minU, maxV - minV);
-      const padU = (side - (maxU - minU)) / 2;
-      const padV = (side - (maxV - minV)) / 2;
-      // No extra ring beyond the square: the inert sites are there to square
-      // the panel off, not to frame it, and every one past that is dead space
-      // the operator has to look past.
-      const c0 = Math.floor(-padU / pitchU);
-      const c1 = Math.ceil((maxU - minU + padU) / pitchU);
-      const r0 = Math.floor(-padV / rowU);
-      const r1 = Math.ceil((maxV - minV + padV) / rowU);
-
-      for (let r = r0; r <= r1; r++) {
-        const off = ((r % 2) + 2) % 2 ? pitchU / 2 : 0;
-        for (let c = c0; c <= c1; c++) {
-          const u = minU + off + c * pitchU;
-          const v = maxV - r * rowU;
-          points.push({
-            x: (u - minU) * scale,
-            y: (maxV - v) * scale,
-            health: occupied.get(key(r, c)) ?? null,
-          });
-        }
-      }
-    } else {
-      for (let i = 0; i < template.length; i++) {
-        const [u, v] = template[i];
-        points.push({
-          x: (u - minU) * scale,
-          y: (maxV - v) * scale, // +v is up; SVG y runs down
-          health: ft.elements[i]?.health ?? "offline",
-        });
-      }
-    }
-
-    // Plot extents come from what was actually generated, which for a square
-    // carrier is wider and taller than the aperture inside it.
-    let width = 0;
-    let height = 0;
-    let originX = Infinity;
-    let originY = Infinity;
-    for (const p of points) {
-      if (p.x < originX) originX = p.x;
-      if (p.y < originY) originY = p.y;
-      if (p.x > width) width = p.x;
-      if (p.y > height) height = p.y;
-    }
-    for (const p of points) {
-      p.x -= originX;
-      p.y -= originY;
-    }
-    width -= originX;
-    height -= originY;
-
-    // Cell size from the lattice itself rather than a constant: the pentagon
-    // and hexagon templates have different spacing, and a fixed radius would
-    // either overlap on one or leave the other looking sparse. Nearest
-    // neighbour over a modest sample is enough — the lattice is uniform.
-    let nearest = Infinity;
-    const sample = Math.min(points.length, 120);
-    for (let i = 0; i < sample; i++) {
-      for (let j = i + 1; j < points.length; j++) {
-        const d = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
-        if (d > 0 && d < nearest) nearest = d;
-      }
-    }
-    if (!Number.isFinite(nearest)) nearest = SPAN / 20;
-    // Circumradius of the Voronoi hexagon is pitch/√3; back off for the gap.
-    const radius = (nearest / Math.sqrt(3)) * 0.92;
-
-    const counts: Record<HealthId, number> = { nominal: 0, degraded: 0, critical: 0, offline: 0 };
-    let inert = 0;
-    for (const p of points) {
-      if (p.health) counts[p.health]++;
-      else inert++;
-    }
+    // Shared lattice is centred on the origin in metres; the SVG wants a
+    // top-left origin in viewBox units.
+    const scale = SPAN / Math.max(lattice.width || 1, lattice.height || 1);
+    const points: Point[] = lattice.sites.map((site) => ({
+      x: (site.u + lattice.width / 2) * scale,
+      y: (lattice.height / 2 - site.v) * scale, // +v is up; SVG y runs down
+      health: site.health,
+    }));
 
     // Faults last so one bad cell is never overdrawn by its healthy neighbours.
-    points.sort((a, b) => Number(a.health !== null && a.health !== "nominal") - Number(b.health !== null && b.health !== "nominal"));
+    points.sort(
+      (a, b) =>
+        Number(a.health !== null && a.health !== "nominal") -
+        Number(b.health !== null && b.health !== "nominal"),
+    );
 
     // The outline traces the RADIATING aperture, not the carrier — that
     // boundary is the point of showing the inert sites at all.
@@ -227,7 +124,15 @@ export function FaceTileGrid({ faceNum }: { faceNum: number }) {
       ? hull.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join("") + "Z"
       : "";
 
-    return { points, radius, width, height, hullPath, counts, inert };
+    return {
+      points,
+      radius: lattice.cellRadius * scale,
+      width: lattice.width * scale,
+      height: lattice.height * scale,
+      hullPath,
+      counts: lattice.counts,
+      inert: lattice.inert,
+    };
   }, [face, ft]);
 
   if (!face || !ft || !plot) return null;

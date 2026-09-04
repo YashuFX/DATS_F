@@ -34,7 +34,7 @@ export function BrandMark({
   const identity = (
     <span className="flex shrink-0 items-center gap-[0.5rem]">
       <Image
-        src="/isro_logo.jpg"
+        src="/isro_logo.png"
         alt="ISRO"
         width={736}
         height={741}
