@@ -28,6 +28,10 @@ export interface GlobeApi {
   setFenceVisible: (visible: boolean) => void;
   /** Show or hide entity labels. */
   setLabelsVisible: (visible: boolean) => void;
+  /** Show or hide the active target's orbit track. */
+  setOrbitVisible: (visible: boolean) => void;
+  /** Show or hide the slant paths from the station to each tracked pass. */
+  setSlantVisible: (visible: boolean) => void;
   /** Swap between satellite imagery and a plain street basemap. */
   setBasemap: (basemap: Basemap) => void;
   /** Switch between the 3D globe and a flat 2D projection. */

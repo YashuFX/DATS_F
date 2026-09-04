@@ -1,26 +1,28 @@
 'use client';
 
 import React from 'react';
-import dynamic from 'next/dynamic';
-import { Crosshair, Maximize2, RefreshCw } from 'lucide-react';
+import { Crosshair, Maximize2 } from 'lucide-react';
+import { TrackingGlobe, type GlobeApi } from '@/features/mnc';
 import { useDashboard } from '../context/DashboardContext';
 import RadarFence from './RadarFence';
 
-// Import MapInner dynamically with SSR disabled to prevent Leaflet execution on server-side.
-const MapInner = dynamic(() => import('./MapInner'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-full w-full flex items-center justify-center bg-da-surface text-da-muted transition-colors duration-200">
-      <div className="flex flex-col items-center gap-3">
-        <RefreshCw className="h-8 w-8 animate-spin text-da-success" />
-        <span className="text-xs font-bold uppercase tracking-wider da-nums">
-          Loading Ground Station Maps...
-        </span>
-      </div>
-    </div>
-  ),
-});
-
+/**
+ * TARGET TRACKING — the console's map.
+ *
+ * The instrument inside this card is `TrackingGlobe`, the same display the M&C
+ * board shows. It replaced a Leaflet map driven by three hard-coded satellites
+ * on a random walk, which meant the two screens could disagree about where the
+ * same sky was. They cannot now: there is one propagator and one component.
+ *
+ * The CARD is unchanged — same `da-card`, same header, same `col-span-6` slot,
+ * same fence readout floating over it. Only what is drawn inside it moved.
+ *
+ * The three header checkboxes were decorative before: they set state nothing
+ * read. They are wired to the globe now, which is also why the two icon buttons
+ * are relabelled — "Fullscreen" had no implementation behind it, and a control
+ * that costs a press to discover is inert is worse on an operator console than
+ * no control at all.
+ */
 export default function TargetTrackingMap() {
   const {
     showOrbits,
@@ -31,6 +33,70 @@ export default function TargetTrackingMap() {
     setShowLabels,
   } = useDashboard();
 
+  const apiRef = React.useRef<GlobeApi | null>(null);
+
+  /* The globe is created long after this mounts, so the toggles an operator set
+     before it was ready have to be replayed onto it — otherwise a box ticked
+     during the Cesium load silently does nothing. */
+  const onReady = React.useCallback(
+    (api: GlobeApi) => {
+      apiRef.current = api;
+      api.setOrbitVisible(showOrbits);
+      api.setSlantVisible(showTrails);
+      api.setLabelsVisible(showLabels);
+    },
+    [showOrbits, showTrails, showLabels],
+  );
+
+  /* One handler rather than three closures built during render: the globe is a
+     mutable resource reached through a ref, and a ref must only be touched from
+     an event or an effect. */
+  const applyToggle = React.useCallback(
+    (kind: 'orbits' | 'trails' | 'labels', next: boolean) => {
+      const api = apiRef.current;
+      if (kind === 'orbits') {
+        setShowOrbits(next);
+        api?.setOrbitVisible(next);
+      } else if (kind === 'trails') {
+        setShowTrails(next);
+        api?.setSlantVisible(next);
+      } else {
+        setShowLabels(next);
+        api?.setLabelsVisible(next);
+      }
+    },
+    [setShowOrbits, setShowTrails, setShowLabels],
+  );
+
+  const resetView = React.useCallback(() => apiRef.current?.focusSite(), []);
+  const fitAll = React.useCallback(() => apiRef.current?.fitAll(), []);
+
+  const toggles: {
+    kind: 'orbits' | 'trails' | 'labels';
+    label: string;
+    title: string;
+    checked: boolean;
+  }[] = [
+    {
+      kind: 'orbits',
+      label: 'Show Orbits',
+      title: "The selected target's orbit track, one revolution centred on now",
+      checked: showOrbits,
+    },
+    {
+      kind: 'trails',
+      label: 'Show Trails',
+      title: 'Slant paths from the station to every pass holding a beam cluster',
+      checked: showTrails,
+    },
+    {
+      kind: 'labels',
+      label: 'Show Labels',
+      title: 'Object names on tracked and selected spacecraft',
+      checked: showLabels,
+    },
+  ];
+
   return (
     <div className="da-card flex flex-col h-full min-h-0 relative overflow-hidden transition-colors duration-200">
       {/* Panel Header */}
@@ -39,40 +105,37 @@ export default function TargetTrackingMap() {
           Target Tracking
         </span>
         <div className="flex items-center gap-4">
-          {/* Controls */}
-          <label className="flex items-center gap-1.5 text-[0.625rem] font-bold text-da-muted cursor-pointer hover:text-da-text transition-colors">
-            <input
-              type="checkbox"
-              checked={showOrbits}
-              onChange={(e) => setShowOrbits(e.target.checked)}
-              className="accent-da-info h-3.5 w-3.5 cursor-pointer rounded"
-            />
-            Show Orbits
-          </label>
-          <label className="flex items-center gap-1.5 text-[0.625rem] font-bold text-da-muted cursor-pointer hover:text-da-text transition-colors">
-            <input
-              type="checkbox"
-              checked={showTrails}
-              onChange={(e) => setShowTrails(e.target.checked)}
-              className="accent-da-info h-3.5 w-3.5 cursor-pointer rounded"
-            />
-            Show Trails
-          </label>
-          <label className="flex items-center gap-1.5 text-[0.625rem] font-bold text-da-muted cursor-pointer hover:text-da-text transition-colors">
-            <input
-              type="checkbox"
-              checked={showLabels}
-              onChange={(e) => setShowLabels(e.target.checked)}
-              className="accent-da-info h-3.5 w-3.5 cursor-pointer rounded"
-            />
-            Show Labels
-          </label>
+          {toggles.map((toggle) => (
+            <label
+              key={toggle.label}
+              title={toggle.title}
+              className="flex items-center gap-1.5 text-[0.625rem] font-bold text-da-muted cursor-pointer hover:text-da-text transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={toggle.checked}
+                onChange={(e) => applyToggle(toggle.kind, e.target.checked)}
+                className="accent-da-info h-3.5 w-3.5 cursor-pointer rounded"
+              />
+              {toggle.label}
+            </label>
+          ))}
 
           <div className="flex items-center gap-2 border-l-[max(1px,0.0625rem)] border-da-border pl-4 text-da-muted">
-            <button className="p-1 rounded-da-sm hover:bg-da-bg hover:text-da-text transition-colors cursor-pointer" title="Reset View">
+            <button
+              type="button"
+              onClick={resetView}
+              className="p-1 rounded-da-sm hover:bg-da-bg hover:text-da-text transition-colors cursor-pointer"
+              title="Centre on the ground station"
+            >
               <Crosshair className="h-3.5 w-3.5" />
             </button>
-            <button className="p-1 rounded-da-sm hover:bg-da-bg hover:text-da-text transition-colors cursor-pointer" title="Fullscreen">
+            <button
+              type="button"
+              onClick={fitAll}
+              className="p-1 rounded-da-sm hover:bg-da-bg hover:text-da-text transition-colors cursor-pointer"
+              title="Fit every tracked object in frame"
+            >
               <Maximize2 className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -80,31 +143,16 @@ export default function TargetTrackingMap() {
       </div>
 
       {/* Map Content */}
-      <div className="grow relative z-0">
-        <MapInner />
+      <div className="grow relative z-0 min-h-0">
+        <TrackingGlobe onReady={onReady} />
 
-        {/* Floating Map Legend (Bottom Left) - translucent glassmorphic style matching the mockup */}
-        <div className="absolute bottom-4 left-4 z-10 bg-white/65 dark:bg-black/60 backdrop-blur-xs border-[max(1px,0.0625rem)] border-black/10 dark:border-white/10 px-4 py-3 rounded-da shadow-da-card select-none transition-colors">
-          <div className="flex flex-col gap-2">
-            {[
-              { label: 'LOCKED', color: 'bg-[#10b981]' },
-              { label: 'DETECTED', color: 'bg-[#3b82f6]' },
-              { label: 'TENTATIVE', color: 'bg-[#f59e0b]' },
-              { label: 'LOST', color: 'bg-[#ef4444]' },
-              { label: 'UNKNOWN', color: 'bg-[#5a6e85]' },
-            ].map(item => (
-              <div key={item.label} className="flex items-center gap-2.5">
-                <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                <span className="text-[0.625rem] font-black uppercase text-da-muted dark:text-white/70 tracking-wider da-nums">
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Floating Fence Parameters (Bottom Right) */}
-        <div className="absolute bottom-4 right-4 z-10">
+        {/* Floating Fence Parameters.
+            Lifted clear of the bottom edge, which the globe's capacity strip
+            now spans end to end. The old map legend that used to sit opposite
+            it is gone with the Leaflet map: it named statuses (LOCKED /
+            TENTATIVE / UNKNOWN) this display does not have, and the capacity
+            strip already carries a legend for the colours it does use. */}
+        <div className="absolute bottom-[3.5rem] right-4 z-20">
           <RadarFence />
         </div>
       </div>

@@ -13,7 +13,8 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildDummyCatalogue, CATALOGUE_SIZE, MIN_SIMULTANEOUS_TARGETS } from "../tle";
-import { getCatalogue, propagateAll } from "../lookAngles";
+import { getCatalogue, propagateAll, orbitalElements } from "../lookAngles";
+import { findPassesFor, currentPass } from "../passes";
 import { planBeams, beamDirections, carryingBeamIndex, separationDeg } from "../beamPlanner";
 import {
   BEAMS,
@@ -304,5 +305,89 @@ describe("capacity — the question the panel answers", () => {
       peakVisible < budget,
       `sky presented ${peakVisible} targets against a budget of ${budget} — hardware is now the limit`,
     );
+  });
+});
+
+/**
+ * What the tracking console reads that the globe does not.
+ *
+ * These exist because `/tracking` shows a spacecraft's orbit and its schedule,
+ * not just where it is now — and every one of them replaced a hard-coded
+ * literal on that screen. A wrong number here is not a broken layout, it is a
+ * plausible-looking figure an operator would plan against.
+ */
+describe("single-satellite readouts", () => {
+  const T0 = Date.UTC(2026, 8, 2, 6, 0, 0);
+  const states = propagateAll(new Date(T0));
+
+  test("orbital speed is a real orbital speed, distinct from range rate", () => {
+    for (const s of states) {
+      // Circular LEO runs 6.9-7.8 km/s across the altitude band the catalogue
+      // spans. A zero here means the propagator's velocity vector was dropped.
+      assert.ok(
+        s.speedKmS > 6.5 && s.speedKmS < 8.2,
+        `${s.id} speed ${s.speedKmS} km/s is not an orbital speed`,
+      );
+      // Range rate is the component along the line of sight, so it can never
+      // exceed the speed itself. Catches the two being confused.
+      assert.ok(
+        Math.abs(s.rangeRateKmS) <= s.speedKmS + 1e-6,
+        `${s.id} range rate ${s.rangeRateKmS} exceeds speed ${s.speedKmS}`,
+      );
+    }
+  });
+
+  test("every object carries the catalogue number its TLE states", () => {
+    const byId = new Map(getCatalogue().map((c) => [c.tle.id, c.tle]));
+    for (const s of states) {
+      assert.equal(s.noradId, byId.get(s.id)?.noradId, `${s.id} NORAD id`);
+      assert.match(s.noradId, /^\d+$/, `${s.id} NORAD id is not numeric`);
+    }
+  });
+
+  test("apogee and perigee bracket the altitude the object is actually at", () => {
+    for (const s of states.slice(0, 40)) {
+      const el = orbitalElements(s.id);
+      assert.ok(el, `${s.id} has no elements`);
+      assert.ok(el.apogeeKm >= el.perigeeKm, `${s.id} apogee below perigee`);
+      // A tolerance, not an equality: apogee/perigee come from the elements
+      // and the altitude from a propagated geodetic height, which differ by
+      // the Earth's flattening. Anything outside this is a units error.
+      assert.ok(
+        s.altitudeKm > el.perigeeKm - 30 && s.altitudeKm < el.apogeeKm + 30,
+        `${s.id} at ${s.altitudeKm.toFixed(0)} km, outside ${el.perigeeKm.toFixed(0)}-${el.apogeeKm.toFixed(0)} km`,
+      );
+      assert.ok(el.periodMin > 90 && el.periodMin < 130, `${s.id} period ${el.periodMin} min`);
+    }
+  });
+
+  test("a single-satellite pass search agrees with the all-sky one", () => {
+    const target = states.filter((s) => s.visible)[0];
+    assert.ok(target, "expected a visible target at T0");
+
+    const passes = findPassesFor(target.id, T0, 180);
+    assert.ok(passes.length > 0, `${target.id} is in view but has no pass`);
+
+    // It is in view at T0, so the search must place it inside a pass — the
+    // check that the profile and the live state cannot disagree.
+    const now = currentPass(passes, T0);
+    assert.ok(now, `${target.id} is visible at T0 but no pass covers T0`);
+
+    for (const pass of passes) {
+      assert.ok(pass.los > pass.aos, "pass ends before it starts");
+      assert.ok(pass.profile.length >= 2, "pass has no drawable profile");
+      assert.equal(pass.profile[0].t, pass.aos, "profile does not start at AOS");
+      assert.equal(pass.profile[pass.profile.length - 1].t, pass.los, "profile does not end at LOS");
+      // Every sampled point is inside the fence, by construction — if one is
+      // not, the pass was closed on the wrong condition.
+      for (const point of pass.profile) {
+        assert.ok(
+          point.elevationDeg >= TRACKING.elevationMaskDeg && point.rangeKm <= TRACKING.maxRangeKm,
+          `${target.id} profile point at el ${point.elevationDeg.toFixed(1)}° is outside the fence`,
+        );
+        assert.ok(point.elevationDeg <= pass.peakElevationDeg + 1e-9, "peak is not the maximum");
+        assert.ok(point.rangeKm >= pass.minRangeKm - 1e-9, "minimum range is not the minimum");
+      }
+    }
   });
 });

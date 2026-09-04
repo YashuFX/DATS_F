@@ -384,6 +384,10 @@ export function CesiumGlobe({ onReady }: { onReady?: (api: GlobeApi) => void }) 
           cur: CesiumNS.Cartesian3;
           slant: CesiumNS.Entity | null;
           slantPositions: CesiumNS.Cartesian3[];
+          /** Holding a beam cluster. Kept on the record rather than inferred
+           *  from the slant path's visibility, which is the AND of this and the
+           *  operator's own toggle and so cannot be read back apart. */
+          tracked: boolean;
           colour: string;
           size: number;
           labelled: boolean;
@@ -636,6 +640,11 @@ export function CesiumGlobe({ onReady }: { onReady?: (api: GlobeApi) => void }) 
            clusters. */
         let pointings: Record<string, BeamPointing> = {};
         let labelsVisible = true;
+        // Held as state for the same reason `labelsVisible` is: the per-tick
+        // pass decides which objects deserve a slant path and an orbit track,
+        // and would otherwise undo an operator's choice on the next tick.
+        let orbitVisible = true;
+        let slantVisible = true;
         // Orbit track propagation is 46 SGP4 calls; at 4 Hz that is 184 a
         // second spent redrawing a line that moves imperceptibly.
         let orbitTargetId: string | null = null;
@@ -748,6 +757,7 @@ export function CesiumGlobe({ onReady }: { onReady?: (api: GlobeApi) => void }) 
                   cur: Cesium.Cartesian3.clone(pos),
                   slant: null,
                   slantPositions: [sitePos, new Cesium.Cartesian3()],
+                  tracked: false,
                   colour,
                   size: -1,
                   labelled: false,
@@ -806,7 +816,8 @@ export function CesiumGlobe({ onReady }: { onReady?: (api: GlobeApi) => void }) 
                   },
                 });
               }
-              if (rec.slant) rec.slant.show = isTracked;
+              rec.tracked = isTracked;
+              if (rec.slant) rec.slant.show = isTracked && slantVisible;
             }
 
             targetId = target?.id ?? null;
@@ -828,7 +839,7 @@ export function CesiumGlobe({ onReady }: { onReady?: (api: GlobeApi) => void }) 
             /* Orbit path: one revolution centred on now, sampled coarsely and
              * only when it has gone stale. */
             const simTime = useSimStore.getState().simTime;
-            if (!target) {
+            if (!target || !orbitVisible) {
               orbitPath.show = false;
               orbitTargetId = null;
             } else if (
@@ -846,7 +857,7 @@ export function CesiumGlobe({ onReady }: { onReady?: (api: GlobeApi) => void }) 
                   );
                 }
               }
-              orbitPath.show = positions.length > 1;
+              orbitPath.show = orbitVisible && positions.length > 1;
               if (orbitPath.polyline && positions.length > 1) {
                 orbitPath.polyline.positions = new Cesium.ConstantProperty(positions);
               }
@@ -1162,6 +1173,22 @@ export function CesiumGlobe({ onReady }: { onReady?: (api: GlobeApi) => void }) 
           },
           setFenceVisible: (visible: boolean) => {
             for (const e of fenceEntities) e.show = visible;
+          },
+          setOrbitVisible: (visible: boolean) => {
+            orbitVisible = visible;
+            // Clearing the memo as well as the flag: without it, switching the
+            // track back on would wait for the next re-propagation before the
+            // line reappeared, which reads as the control not working.
+            if (!visible) orbitPath.show = false;
+            else orbitTargetId = null;
+          },
+          setSlantVisible: (visible: boolean) => {
+            // Applied now rather than left to the next tick: a quarter second
+            // between pressing a toggle and seeing it act reads as a miss.
+            slantVisible = visible;
+            for (const rec of sats.values()) {
+              if (rec.slant) rec.slant.show = visible && rec.tracked;
+            }
           },
           setLabelsVisible: (visible: boolean) => {
             // Held as state, not stamped once: the per-tick pass decides which

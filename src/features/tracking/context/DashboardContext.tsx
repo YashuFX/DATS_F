@@ -1,9 +1,53 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { SITE, TRACKING, BEAMS_PER_TARGET } from '@/features/mnc/data/mnc.mock';
+import {
+  activeTarget,
+  useSimStore,
+  type BeamPointing,
+} from '@/features/mnc/sim/simStore';
+import {
+  beamDirections,
+  carryingBeamIndex,
+  separationDeg,
+  type BeamAssignment,
+  type ClusterBeam,
+} from '@/features/mnc/sim/beamPlanner';
+import { orbitalElements, type SatelliteState } from '@/features/mnc/sim/lookAngles';
+import { currentPass, findPassesFor, type SatellitePass } from '@/features/mnc/sim/passes';
+
+/**
+ * TRACKING — the console's data, adapted from the simulation.
+ *
+ * ---- what this used to be ----
+ *
+ * Three hard-coded spacecraft, a 1 Hz `setInterval` that random-walked azimuth
+ * and elevation, a hand-written pass table, and track events drawn from
+ * `Math.random()`. Nothing on this screen had any relationship to the SGP4
+ * simulation the M&C board runs, which meant the two screens could — and did —
+ * disagree about where the same sky was.
+ *
+ * ---- what it is now ----
+ *
+ * An ADAPTER. Every number below comes from `features/mnc/sim`: the same
+ * propagator, the same beam planner, the same pass search the globe draws from.
+ * This file is the single seam where that simulation is mapped onto the shapes
+ * this console's panels already expect, which is why the panels themselves
+ * barely changed — they still call `useDashboard()`, it just tells the truth
+ * now.
+ *
+ * Two things are deliberately still local state: the rotor and the radio. This
+ * simulation models the SKY, not the ground equipment, and inventing a rotor
+ * position from an orbit would be exactly the kind of plausible fiction the
+ * rest of this change removes. They stay operator-driven, and the one number
+ * that IS derivable — Doppler — is derived.
+ */
+
+/** A satellite id from the simulated catalogue, e.g. `SAT-07`. */
+export type SatId = string;
 
 export type ActiveMode = 'realtime' | 'offline';
-export type SatId = 't1' | 't2' | 't3';
 
 export interface Satellite {
   id: string;
@@ -35,12 +79,27 @@ export interface TrackEvent {
   message: string;
 }
 
+/** The beam cluster serving the selected target, ready to render. */
+export interface BeamReadout {
+  beams: ClusterBeam[];
+  /** Index into `beams` of the one currently holding the target. */
+  carrying: number;
+  /** How far the target has walked off the commanded direction, degrees. */
+  driftDeg: number;
+  /** The face carrying this cluster, or null when the target is unserved. */
+  assignment: BeamAssignment | null;
+  commanded: { azimuthDeg: number; elevationDeg: number };
+  beamsPerTarget: number;
+}
+
 interface DashboardContextType {
   mode: ActiveMode;
   setMode: (mode: ActiveMode) => void;
   activeSat: SatId;
   setActiveSat: (id: SatId) => void;
   satellites: Record<SatId, Satellite>;
+  /** Ids in the order the tabs should show them — highest pass first. */
+  satelliteOrder: SatId[];
   livePosition: {
     azimuth: number;
     elevation: number;
@@ -48,8 +107,19 @@ interface DashboardContextType {
     velocity: number;
     lat: number;
     lng: number;
+    rangeKm: number;
+    rangeRateKmS: number;
   };
   countdownSeconds: number;
+  /** True while the active target is inside the fence. */
+  inFence: boolean;
+  /** Simulated epoch, ms — the console's clock. */
+  simTime: number;
+  /** Passes of the active target over the next 24 simulated hours. */
+  passes: SatellitePass[];
+  activePass: SatellitePass | null;
+  /** The active target's beam cluster, or null when nothing is selected. */
+  beam: BeamReadout | null;
   // Rotor
   rotorConnected: 'connected' | 'disconnected' | 'parking';
   setRotorConnected: (state: 'connected' | 'disconnected' | 'parking') => void;
@@ -87,293 +157,365 @@ interface DashboardContextType {
   };
 }
 
-/**
- * The three targets this console tracks — all ISRO spacecraft.
- *
- * The migrated console carried YUBILEINY (RS30), the ISS and OSCAR 7, which are
- * Russian, international and American respectively. This station tracks Indian
- * satellites, so the catalogue is RISAT-2B, CARTOSAT-3 and RESOURCESAT-2A, with
- * their real NORAD numbers and orbits.
- */
-const initialSatellites: Record<SatId, Satellite> = {
-  t1: {
-    id: 'T1',
-    noradId: '44233',
-    name: 'RISAT-2B',
-    shortName: 'RISAT-2B',
-    description: 'RISAT-2B - X-band synthetic aperture radar imaging satellite',
-    alive: true,
-    countryFlags: ['🇮🇳'],
-    baseAzimuth: 27.2,
-    baseElevation: -11.3,
-    baseAltitude: 557,
-    baseVelocity: 7.58,
-    apogee: 565.4,
-    perigee: 548.9,
-    inclination: 37.00,
-    passDuration: '0s',
-    vfo1Uplink: '2071.875 MHz',
-    vfo2Downlink: '8212.500 MHz',
-    vfo1Freq: '2.071.875.000',
-    vfo2Freq: '8.212.500.000',
-  },
-  t2: {
-    id: 'T2',
-    noradId: '44804',
-    name: 'CARTOSAT-3',
-    shortName: 'CARTOSAT-3',
-    description: 'CARTOSAT-3 - High-resolution Earth observation satellite',
-    alive: true,
-    countryFlags: ['🇮🇳'],
-    baseAzimuth: 306.5,
-    baseElevation: 9.7,
-    baseAltitude: 509,
-    baseVelocity: 7.61,
-    apogee: 512.3,
-    perigee: 504.8,
-    inclination: 97.50,
-    passDuration: '8m 54s',
-    vfo1Uplink: '2101.800 MHz',
-    vfo2Downlink: '8300.000 MHz',
-    vfo1Freq: '2.101.800.000',
-    vfo2Freq: '8.299.999.928',
-  },
-  t3: {
-    id: 'T3',
-    noradId: '41877',
-    name: 'RESOURCESAT-2A',
-    shortName: 'RESOURCESAT-2A',
-    description: 'RESOURCESAT-2A - Multispectral land and water resources imager',
-    alive: true,
-    countryFlags: ['🇮🇳'],
-    baseAzimuth: 222.6,
-    baseElevation: 26.3,
-    baseAltitude: 817,
-    baseVelocity: 7.44,
-    apogee: 823.7,
-    perigee: 810.2,
-    inclination: 98.72,
-    passDuration: '14m 20s',
-    vfo1Uplink: '2087.500 MHz',
-    vfo2Downlink: '8125.000 MHz',
-    vfo1Freq: '2.087.500.000',
-    vfo2Freq: '8.125.000.085',
-  },
-};
-
-const initialEvents: TrackEvent[] = [
-  { time: '09:03:00.124', id: 'TRK-0248', name: 'RISAT-2B', status: 'locked', message: 'LOCK ACQUIRED' },
-  { time: '09:02:58.771', id: 'TRK-0250', name: 'CARTOSAT-3', status: 'detected', message: 'DETECTED' },
-  { time: '09:02:51.362', id: 'TRK-0248', name: 'RISAT-2B', status: 'locked', message: 'TELEMETRY DECODED' },
-  { time: '09:02:44.219', id: 'TRK-0251', name: 'RESOURCESAT-2A', status: 'tentative', message: 'ASSOCIATION CONFIRMED' },
-  { time: '09:02:40.115', id: 'TRK-0242', name: 'UNKNOWN', status: 'lost', message: 'TRACK LOST' },
-];
-
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
+/* ── derived per-spacecraft constants ──────────────────────────────────────
+   The simulation models orbits, not radios. These are per-object constants an
+   operator would read off a mission plan, derived from the catalogue number so
+   they are STABLE for a given spacecraft and identical on every reload — the
+   same determinism rule the TLE generator follows, and the reason there is no
+   `Math.random()` anywhere in this file.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Speed of light, km/s — for the Doppler shift, which IS derivable. */
+const C_KM_S = 299_792.458;
+
+/** S-band TT&C uplink, 2025-2110 MHz. */
+function uplinkHz(noradId: string): number {
+  return (2025 + (Number(noradId) % 850) / 10) * 1e6;
+}
+
+/** X-band payload downlink, 8025-8400 MHz. */
+function downlinkHz(noradId: string): number {
+  return (8025 + (Number(noradId) % 3750) / 10) * 1e6;
+}
+
+/** `2.071.875.000` — the grouped form the VFO readouts render. */
+function groupHz(hz: number): string {
+  return Math.round(hz)
+    .toString()
+    .padStart(10, '0')
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function formatMHz(hz: number): string {
+  return `${(hz / 1e6).toFixed(3)} MHz`;
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+/** The console's clock, printed. Simulated time, not wall time. */
+function formatSimTime(ms: number): string {
+  const d = new Date(ms);
+  return [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join(':');
+}
+
+/** Map one simulated state onto the shape this console's panels expect. */
+function toSatellite(state: SatelliteState, pass: SatellitePass | null): Satellite {
+  const elements = orbitalElements(state.id);
+  const up = uplinkHz(state.noradId);
+  const down = downlinkHz(state.noradId);
+  return {
+    id: state.id,
+    noradId: state.noradId,
+    name: state.name,
+    shortName: state.id,
+    description: `${state.name} — ${state.regime} simulated target`,
+    alive: true,
+    countryFlags: ['🇮🇳'],
+    baseAzimuth: state.azimuthDeg,
+    baseElevation: state.elevationDeg,
+    baseAltitude: state.altitudeKm,
+    baseVelocity: state.speedKmS,
+    apogee: elements?.apogeeKm ?? state.altitudeKm,
+    perigee: elements?.perigeeKm ?? state.altitudeKm,
+    inclination: elements?.inclinationDeg ?? 0,
+    passDuration: pass ? formatDuration(pass.durationS) : '0s',
+    vfo1Uplink: formatMHz(up),
+    vfo2Downlink: formatMHz(down),
+    vfo1Freq: groupHz(up),
+    vfo2Freq: groupHz(down),
+  };
+}
+
+/**
+ * How far ahead the pass search runs, and how coarsely it is re-run.
+ *
+ * A 24-hour search over one satellite costs 20-55 ms. That is cheap for what
+ * it answers and far too expensive to repeat on a 4 Hz tick, so it is bucketed:
+ * the window start is rounded down and the result reused until the clock leaves
+ * the bucket. Passes a day out do not move in half an hour of simulated time,
+ * so nothing is lost — and at 60x the recompute still lands only every thirty
+ * real seconds, where the globe's tween absorbs it.
+ */
+const PASS_HORIZON_MIN = 24 * 60;
+const PASS_BUCKET_MS = 30 * 60 * 1000;
+
+/**
+ * Track events, from the sky rather than from a random number generator.
+ *
+ * Subscribed OUTSIDE React's render cycle and diffed against the previous
+ * tick: an event is a TRANSITION — a spacecraft crossing into the fence,
+ * winning or losing a beam cluster, setting — and a transition cannot be read
+ * from a snapshot. Every line in the log is therefore something that actually
+ * happened, at the simulated time it happened, and an operator can point at a
+ * dot on the globe and find the row that put it there.
+ */
+function useFenceEvents(): [TrackEvent[], (event: TrackEvent) => void] {
+  const [events, setEvents] = useState<TrackEvent[]>([]);
+
+  const addEvent = React.useCallback((event: TrackEvent) => {
+    setEvents((prev) => [event, ...prev.slice(0, 39)]);
+  }, []);
+
+  useEffect(() => {
+    let previousVisible = new Set<string>();
+    let previousTracked = new Set<string>();
+    let seeded = false;
+
+    return useSimStore.subscribe((state) => {
+      const visible = new Set<string>();
+      const names = new Map<string, string>();
+      for (const s of state.states) {
+        if (!s.visible) continue;
+        visible.add(s.id);
+        names.set(s.id, s.name);
+      }
+      const tracked = new Set(state.plan.assignments.map((a) => a.satelliteId));
+
+      /* The first tick is a snapshot, not a set of transitions. Logging it
+         would open the console with twenty "signal acquired" lines for passes
+         that were already in progress before anyone was watching. */
+      if (!seeded) {
+        seeded = true;
+        previousVisible = visible;
+        previousTracked = tracked;
+        return;
+      }
+
+      const time = formatSimTime(state.simTime);
+      const batch: TrackEvent[] = [];
+      const push = (id: string, status: TrackEvent['status'], message: string) =>
+        batch.push({ time, id, name: names.get(id) ?? id, status, message });
+
+      for (const id of visible) {
+        if (!previousVisible.has(id)) push(id, 'detected', 'SIGNAL ACQUIRED');
+      }
+      for (const id of tracked) {
+        if (!previousTracked.has(id)) push(id, 'locked', 'LOCK ACQUIRED');
+      }
+      for (const id of previousTracked) {
+        // Beams released while the spacecraft is still up is a different fault
+        // from the pass ending, and the two must not read the same: one is the
+        // aperture running out of capacity, the other is orbital mechanics.
+        if (!tracked.has(id) && visible.has(id)) push(id, 'tentative', 'BEAMS RELEASED');
+      }
+      for (const id of previousVisible) {
+        if (!visible.has(id)) push(id, 'lost', 'TRACK LOST — LOS');
+      }
+
+      previousVisible = visible;
+      previousTracked = tracked;
+
+      if (batch.length === 0) return;
+      // One state update per tick rather than one per event: a busy horizon can
+      // produce half a dozen transitions in the same step.
+      setEvents((prev) => [...batch, ...prev].slice(0, 40));
+    });
+  }, []);
+
+  return [events, addEvent];
+}
+
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<ActiveMode>('realtime');
-  const [activeSat, setActiveSat] = useState<SatId>('t2');
-  const [satellites] = useState<Record<SatId, Satellite>>(initialSatellites);
-  
-  // Dynamic Live Position Simulation
-  const [livePosition, setLivePosition] = useState({
-    azimuth: 306.5,
-    elevation: 9.7,
-    altitude: 427,
-    velocity: 7.66,
-    lat: 13.035571678248347,
-    lng: 77.51063448300057,
-  });
+  /* ---- the simulation ---- */
+  const states = useSimStore((s) => s.states);
+  const plan = useSimStore((s) => s.plan);
+  const simTime = useSimStore((s) => s.simTime);
+  const running = useSimStore((s) => s.running);
+  const pointings = useSimStore((s) => s.pointings);
+  const selectedId = useSimStore((s) => s.selectedId);
+  const target = useSimStore(activeTarget);
 
-  const [countdownSeconds, setCountdownSeconds] = useState(534); // 8m 54s in seconds
-  const [dopplerShift, setDopplerShift] = useState(9922); // +9922 Hz
-
-  // Rotor states
+  /* ---- ground equipment: operator-driven, not simulated ---- */
   const [rotorConnected, setRotorConnected] = useState<'connected' | 'disconnected' | 'parking'>('connected');
   const [rotorTracking, setRotorTracking] = useState(true);
   const [rotorIp, setRotorIp] = useState('192.168.60.97:4533');
-
-  // Radio states
   const [radioConnected, setRadioConnected] = useState(true);
   const [radioTracking, setRadioTracking] = useState(true);
   const [radioModel, setRadioModel] = useState('FT-857D');
-  const [vfo1Freq, setVfo1Freq] = useState('145.986.689');
-  const [vfo2Freq, setVfo2Freq] = useState('437.809.928');
 
-  // Map settings
+  /* ---- map toggles ---- */
   const [showOrbits, setShowOrbits] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
 
-  // Events
-  const [events, setEvents] = useState<TrackEvent[]>(initialEvents);
+  const [events, addEvent] = useFenceEvents();
 
-  const stationCoords = {
-    lat: 13.035571678248347,
-    lng: 77.51063448300057,
-    elevation: 780, // m
-  };
+  /* The tracking console opens live.
+   *
+   * This screen used to default to `mode: 'realtime'` with a random walk behind
+   * it, so it was always moving. Now that "realtime" means the simulation is
+   * actually running, opening stopped would show an operator a frozen sky and
+   * leave them to discover the mode switch — a worse first frame than the one
+   * they had. The M&C board keeps its explicit run control; this console starts
+   * itself and offers the same switch in the header. */
+  useEffect(() => {
+    const store = useSimStore.getState();
+    if (!store.running) store.start();
+  }, []);
 
-  const addEvent = (event: TrackEvent) => {
-    setEvents(prev => [event, ...prev.slice(0, 19)]);
-  };
+  const activeSat: SatId = target?.id ?? selectedId ?? '';
 
-  // Selecting a different satellite resets the live readouts to that
-  // satellite's baseline. React's documented way to reset state when a value
-  // changes is to compare it during render, not to write state from an effect:
-  // the effect version renders one frame showing the previous satellite's
-  // numbers before correcting itself.
-  const [syncedSat, setSyncedSat] = useState(activeSat);
-  if (syncedSat !== activeSat) {
-    setSyncedSat(activeSat);
-      const selected = satellites[activeSat];
-      setLivePosition({
-        azimuth: selected.baseAzimuth,
-        elevation: selected.baseElevation,
-        altitude: selected.baseAltitude,
-        velocity: selected.baseVelocity,
-        // Simulate offsets based on active satellite
-        lat: stationCoords.lat + (activeSat === 't1' ? -0.15 : activeSat === 't3' ? 0.25 : 0.08),
-        lng: stationCoords.lng + (activeSat === 't1' ? 0.3 : activeSat === 't3' ? -0.2 : 0.12),
-      });
+  /* ---- the tab set ----
+     The served targets, in the planner's own order — descending elevation,
+     which is also descending usefulness. The selection is pinned in front even
+     when the planner could not serve it, so clicking an unserved pass does not
+     make its own tab vanish. */
+  const satelliteOrder = useMemo(() => {
+    const order = plan.assignments.map((a) => a.satelliteId);
+    if (activeSat && !order.includes(activeSat)) return [activeSat, ...order];
+    return order;
+  }, [plan, activeSat]);
 
-      if (activeSat === 't1') {
-        setCountdownSeconds(0);
-        setVfo1Freq(selected.vfo1Freq);
-        setVfo2Freq(selected.vfo2Freq);
-        setDopplerShift(-1420);
-      } else if (activeSat === 't2') {
-        setCountdownSeconds(534);
-        setVfo1Freq(selected.vfo1Freq);
-        setVfo2Freq(selected.vfo2Freq);
-        setDopplerShift(9922);
-      } else {
-        setCountdownSeconds(860);
-        setVfo1Freq(selected.vfo1Freq);
-        setVfo2Freq(selected.vfo2Freq);
-        setDopplerShift(3452);
-      }
+  /* ---- passes for the selected target ---- */
+  const passWindowStart = Math.floor(simTime / PASS_BUCKET_MS) * PASS_BUCKET_MS;
+  const passes = useMemo(
+    () => (activeSat ? findPassesFor(activeSat, passWindowStart, PASS_HORIZON_MIN) : []),
+    [activeSat, passWindowStart],
+  );
+  const activePass = useMemo(() => currentPass(passes, simTime), [passes, simTime]);
+
+  const byId = useMemo(() => new Map(states.map((s) => [s.id, s])), [states]);
+
+  const satellites = useMemo(() => {
+    const out: Record<SatId, Satellite> = {};
+    for (const id of satelliteOrder) {
+      const state = byId.get(id);
+      if (state) out[id] = toSatellite(state, id === activeSat ? activePass : null);
+    }
+    return out;
+  }, [satelliteOrder, byId, activeSat, activePass]);
+
+  const livePosition = useMemo(
+    () => ({
+      azimuth: target?.azimuthDeg ?? 0,
+      elevation: target?.elevationDeg ?? 0,
+      altitude: target?.altitudeKm ?? 0,
+      velocity: target?.speedKmS ?? 0,
+      lat: target?.latDeg ?? SITE.latDeg,
+      lng: target?.lonDeg ?? SITE.lonDeg,
+      rangeKm: target?.rangeKm ?? 0,
+      rangeRateKmS: target?.rangeRateKmS ?? 0,
+    }),
+    [target],
+  );
+
+  /* ---- the beam cluster serving the selection ----
+     Drawn about the COMMANDED direction, not the spacecraft: the array is
+     steered to a prediction and holds it while the target walks off, and that
+     gap is the whole reason there are five tracking beams. Falling back to the
+     target's own direction covers the tick between selecting an object and the
+     array being re-steered onto it. */
+  const beam = useMemo<BeamReadout | null>(() => {
+    if (!target) return null;
+    const latched: BeamPointing | undefined = pointings[target.id];
+    const commanded = latched
+      ? { azimuthDeg: latched.azimuthDeg, elevationDeg: latched.elevationDeg }
+      : { azimuthDeg: target.azimuthDeg, elevationDeg: target.elevationDeg };
+    const beams = beamDirections(commanded.azimuthDeg, commanded.elevationDeg);
+    return {
+      beams,
+      carrying: carryingBeamIndex(beams, target.azimuthDeg, target.elevationDeg),
+      driftDeg: separationDeg(
+        target.azimuthDeg,
+        target.elevationDeg,
+        commanded.azimuthDeg,
+        commanded.elevationDeg,
+      ),
+      assignment: plan.assignments.find((a) => a.satelliteId === target.id) ?? null,
+      commanded,
+      beamsPerTarget: BEAMS_PER_TARGET,
+    };
+  }, [target, pointings, plan]);
+
+  /* ---- Doppler, actually computed ----
+     f_shift = -(range rate / c) * f. The console used to drift a seeded
+     integer by a random step; this is the shift the measured range rate
+     implies on the spacecraft's own downlink, so it crosses zero at closest
+     approach the way a real one does. */
+  const dopplerShift = useMemo(() => {
+    if (!target) return 0;
+    return Math.round((-target.rangeRateKmS / C_KM_S) * downlinkHz(target.noradId));
+  }, [target]);
+
+  /* ---- VFO readouts ----
+     Held as state so the operator can type over them, re-seeded when the
+     selection changes. Compared during render rather than synchronised in an
+     effect: the effect version renders one frame showing the previous
+     spacecraft's frequencies before correcting itself. */
+  const active = activeSat ? satellites[activeSat] : undefined;
+  const [vfoSat, setVfoSat] = useState<SatId>('');
+  const [vfo1Freq, setVfo1Freq] = useState('');
+  const [vfo2Freq, setVfo2Freq] = useState('');
+  if (active && vfoSat !== activeSat) {
+    setVfoSat(activeSat);
+    setVfo1Freq(active.vfo1Freq);
+    setVfo2Freq(active.vfo2Freq);
   }
 
-  // Live updates simulator for Real-time mode
-  useEffect(() => {
-    if (mode !== 'realtime') return;
+  const countdownSeconds = activePass ? Math.max(0, (activePass.los - simTime) / 1000) : 0;
 
-    const interval = setInterval(() => {
-      // Slightly drift Azimuth, Elevation, Altitude, Doppler and Countdown
-      setLivePosition(prev => {
-        // Azimuth wraps around 360
-        let newAz = prev.azimuth + (Math.random() - 0.3) * 0.2;
-        if (newAz < 0) newAz += 360;
-        if (newAz >= 360) newAz -= 360;
+  const value: DashboardContextType = {
+    // The mode switch drives the simulation itself — an "offline" console that
+    // kept propagating would be lying about which of the two it was in.
+    mode: running ? 'realtime' : 'offline',
+    setMode: (next) => {
+      const store = useSimStore.getState();
+      if (next === 'realtime') store.start();
+      else store.stop();
+    },
+    activeSat,
+    setActiveSat: (id) => useSimStore.getState().selectSatellite(id || null),
+    satellites,
+    satelliteOrder,
+    livePosition,
+    countdownSeconds,
+    inFence: Boolean(target?.visible),
+    simTime,
+    passes,
+    activePass,
+    beam,
+    rotorConnected,
+    setRotorConnected,
+    rotorTracking,
+    setRotorTracking,
+    rotorIp,
+    setRotorIp,
+    radioConnected,
+    setRadioConnected,
+    radioTracking,
+    setRadioTracking,
+    radioModel,
+    setRadioModel,
+    vfo1Freq,
+    vfo2Freq,
+    setVfo1Freq,
+    setVfo2Freq,
+    dopplerShift,
+    showOrbits,
+    setShowOrbits,
+    showTrails,
+    setShowTrails,
+    showLabels,
+    setShowLabels,
+    events,
+    addEvent,
+    stationCoords: {
+      lat: SITE.latDeg,
+      lng: SITE.lonDeg,
+      elevation: SITE.heightM,
+    },
+  };
 
-        // Elevation climbs or falls slowly
-        let newEl = prev.elevation + (Math.random() - 0.45) * 0.1;
-        if (newEl > 90) newEl = 90;
-        if (newEl < -90) newEl = -90;
-
-        // Altitude drifts by a few meters
-        const newAlt = prev.altitude + (Math.random() - 0.5) * 0.05;
-        // Velocity drifts slightly
-        const newVel = prev.velocity + (Math.random() - 0.5) * 0.002;
-
-        // Latitude/longitude drift to show satellite trail movement
-        const newLat = prev.lat + (Math.random() - 0.4) * 0.002;
-        const newLng = prev.lng + (Math.random() - 0.4) * 0.0035;
-
-        return {
-          azimuth: parseFloat(newAz.toFixed(1)),
-          elevation: parseFloat(newEl.toFixed(1)),
-          altitude: parseFloat(newAlt.toFixed(1)),
-          velocity: parseFloat(newVel.toFixed(2)),
-          lat: parseFloat(newLat.toFixed(6)),
-          lng: parseFloat(newLng.toFixed(6)),
-        };
-      });
-
-      setCountdownSeconds(prev => {
-        if (prev <= 1) return 600; // Reset countdown
-        return prev - 1;
-      });
-
-      setDopplerShift(prev => {
-        const drift = Math.floor((Math.random() - 0.5) * 15);
-        return prev + drift;
-      });
-
-      // Randomly trigger new track events
-      if (Math.random() < 0.05) {
-        const targetIds = ['TRK-0248', 'TRK-0250', 'TRK-0249', 'TRK-0251', 'TRK-0242'];
-        const targetNames = ['RISAT-2B', 'CARTOSAT-3', 'TRK-0249', 'RESOURCESAT-2A', 'TRK-0242'];
-        const statuses: ('locked' | 'detected' | 'tentative' | 'lost' | 'unknown')[] = [
-          'locked', 'detected', 'tentative', 'lost', 'unknown'
-        ];
-        const messages = [
-          'TELEMETRY DECODED', 'LOCK ACQUIRED', 'SIGNAL ACQUIRED', 'RANGE UPDATE', 'TRACK LOST', 'ASSOCIATION UPDATED'
-        ];
-
-        const index = Math.floor(Math.random() * targetIds.length);
-        const status = statuses[Math.floor(Math.random() * statuses.length)];
-        const msg = messages[Math.floor(Math.random() * messages.length)];
-
-        const now = new Date();
-        const timeStr = `${now.toTimeString().split(' ')[0]}.${String(now.getMilliseconds()).padStart(3, '0')}`;
-
-        addEvent({
-          time: timeStr,
-          id: targetIds[index],
-          name: targetNames[index],
-          status: status,
-          message: msg,
-        });
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [mode]);
-
-  return (
-    <DashboardContext.Provider
-      value={{
-        mode,
-        setMode,
-        activeSat,
-        setActiveSat,
-        satellites,
-        livePosition,
-        countdownSeconds,
-        rotorConnected,
-        setRotorConnected,
-        rotorTracking,
-        setRotorTracking,
-        rotorIp,
-        setRotorIp,
-        radioConnected,
-        setRadioConnected,
-        radioTracking,
-        setRadioTracking,
-        radioModel,
-        setRadioModel,
-        vfo1Freq,
-        vfo2Freq,
-        setVfo1Freq,
-        setVfo2Freq,
-        dopplerShift,
-        showOrbits,
-        setShowOrbits,
-        showTrails,
-        setShowTrails,
-        showLabels,
-        setShowLabels,
-        events,
-        addEvent,
-        stationCoords,
-      }}
-    >
-      {children}
-    </DashboardContext.Provider>
-  );
+  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
 }
 
 export function useDashboard() {
@@ -383,3 +525,5 @@ export function useDashboard() {
   }
   return context;
 }
+
+export { TRACKING };

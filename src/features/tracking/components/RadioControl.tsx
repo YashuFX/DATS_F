@@ -32,7 +32,11 @@ export default function RadioControl() {
     satellites,
   } = useDashboard();
 
-  const sat = satellites[activeSat];
+  /* The served set is whatever is over the horizon, so it can be empty and the
+     selection can name an object that has just set. A radio panel with no
+     spacecraft to tune to still has to render — this used to index a fixed
+     table of three and could not miss. */
+  const sat = activeSat ? satellites[activeSat] : undefined;
 
   // Settings panel visibility
   const [txSettingsOpen, setTxSettingsOpen] = useState(false);
@@ -43,8 +47,18 @@ export default function RadioControl() {
   // VFO dropdown state
   const [vfo1Open, setVfo1Open] = useState(false);
   const [vfo2Open, setVfo2Open] = useState(false);
-  const [selectedVfo1, setSelectedVfo1] = useState(sat.vfo1Uplink);
-  const [selectedVfo2, setSelectedVfo2] = useState(sat.vfo2Downlink);
+  /* Re-seeded when the operator selects a different spacecraft, compared during
+     render rather than synchronised in an effect: the effect version renders
+     one frame showing the previous target's frequencies before correcting
+     itself. (React's documented way to reset state on a prop change.) */
+  const [selectedVfo1, setSelectedVfo1] = useState('');
+  const [selectedVfo2, setSelectedVfo2] = useState('');
+  const [vfoSat, setVfoSat] = useState<string | undefined>(undefined);
+  if (sat && vfoSat !== activeSat) {
+    setVfoSat(activeSat);
+    setSelectedVfo1(sat.vfo1Uplink);
+    setSelectedVfo2(sat.vfo2Downlink);
+  }
 
   // Helper to format Doppler shift string
   const formatDoppler = (hz: number) => {
@@ -78,13 +92,13 @@ export default function RadioControl() {
   /** VFO frequency presets for each satellite */
   const vfoPresets = {
     uplink: [
-      { label: `${sat.name} Uplink`, value: sat.vfo1Uplink },
+      { label: `${sat?.name ?? 'Target'} Uplink`, value: sat?.vfo1Uplink ?? '—' },
       { label: 'APRS 144.800 MHz', value: '144.800 MHz' },
       { label: 'CW Beacon 145.825 MHz', value: '145.825 MHz' },
       { label: 'Telemetry 2245.000 MHz', value: '2245.000 MHz' },
     ],
     downlink: [
-      { label: `${sat.name} Downlink`, value: sat.vfo2Downlink },
+      { label: `${sat?.name ?? 'Target'} Downlink`, value: sat?.vfo2Downlink ?? '—' },
       { label: 'APRS 435.800 MHz', value: '435.800 MHz' },
       { label: 'S-Band 2200.000 MHz', value: '2200.000 MHz' },
       { label: 'X-Band 8450.000 MHz', value: '8450.000 MHz' },

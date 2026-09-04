@@ -1,37 +1,30 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { BrandMark } from '@/features/shell/BrandMark';
 import { OperatorChip } from '@/features/shell/OperatorChip';
 import { useDashboard } from '../context/DashboardContext';
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export default function Header() {
-  const { mode, setMode, stationCoords } = useDashboard();
-  const [time, setTime] = useState<string>('09:03:00');
-  const [date, setDate] = useState<string>('20 May 2025 EEST');
+  const { mode, setMode, stationCoords, simTime } = useDashboard();
 
-  // The offline readout is two constants, so it is derived below rather than
-  // written into state — which also removes a setState from this effect body.
-  useEffect(() => {
-    if (mode === 'offline') return;
-
-    const updateTime = () => {
-      const now = new Date();
-      const pad = (num: number) => String(num).padStart(2, '0');
-      setTime(`${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`);
-
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      setDate(`${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} Local`);
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, [mode]);
-
-  const displayTime = mode === 'offline' ? '09:03:00' : time;
-  const displayDate = mode === 'offline' ? '20 May 2025 EEST' : date;
+  /**
+   * The SIMULATED clock, not the wall clock.
+   *
+   * This used to tick off `new Date()`. Every other panel on the screen now
+   * reads pass times, AOS and LOS off the simulation's own epoch, and a header
+   * showing local wall time beside a pass table showing 06:12 UTC is a console
+   * that appears to disagree with itself — worse at 60x, where the two would
+   * visibly diverge as you watched. One clock, and it is the one the geometry
+   * is computed against.
+   */
+  const clock = new Date(simTime);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const displayTime = `${pad(clock.getUTCHours())}:${pad(clock.getUTCMinutes())}:${pad(clock.getUTCSeconds())}`;
+  const displayDate = `${clock.getUTCDate()} ${MONTHS[clock.getUTCMonth()]} ${clock.getUTCFullYear()} UTC`;
 
   return (
     <header className="flex items-center justify-between shrink-0 bg-da-surface border-b-[max(1px,0.0625rem)] border-da-border px-6 py-1.5 transition-colors duration-200 gap-4">

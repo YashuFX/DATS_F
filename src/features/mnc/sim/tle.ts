@@ -112,6 +112,8 @@ function pad(value: string, width: number): string {
 export interface DummyTle {
   id: string;
   name: string;
+  /** Catalogue number carried in the TLE, as an operator would quote it. */
+  noradId: string;
   line1: string;
   line2: string;
   /** Nominal orbit family, for grouping in the UI. */
@@ -188,6 +190,7 @@ export function buildDummyCatalogue(seed = 0x7a11): DummyTle[] {
     out.push({
       id: `SAT-${String(idx + 1).padStart(2, "0")}`,
       name: `DATS-SIM ${String(idx + 1).padStart(2, "0")}`,
+      noradId: String(noradId),
       line1,
       line2,
       regime: regimeFor(inclination),

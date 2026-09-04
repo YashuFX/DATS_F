@@ -44,6 +44,8 @@ import { buildDummyCatalogue, type DummyTle } from "./tle";
 export interface SatelliteState {
   id: string;
   name: string;
+  /** Catalogue number, as an operator would quote it. */
+  noradId: string;
   regime: DummyTle["regime"];
   /** Degrees, 0..360 clockwise from true north. */
   azimuthDeg: number;
@@ -57,8 +59,25 @@ export interface SatelliteState {
   latDeg: number;
   lonDeg: number;
   altitudeKm: number;
+  /** Orbital speed, km/s.
+   *
+   *  Distinct from `rangeRateKmS`, and both are worth carrying: this is how
+   *  fast the spacecraft is travelling, that is how fast the DISTANCE to it is
+   *  changing. A pass at closest approach has a range rate near zero while
+   *  still moving at 7.5 km/s, and a readout that conflated them would show a
+   *  spacecraft apparently coasting to a halt overhead. */
+  speedKmS: number;
   /** Inside the station's tracking volume: above the elevation mask and in range. */
   visible: boolean;
+}
+
+/** Orbit shape, from the TLE's own elements. Constant per object. */
+export interface OrbitalElements {
+  apogeeKm: number;
+  perigeeKm: number;
+  inclinationDeg: number;
+  /** Orbital period, minutes. */
+  periodMin: number;
 }
 
 /** Parsed once — `twoline2satrec` is the expensive half of SGP4. */
@@ -97,8 +116,13 @@ export function propagateAll(when: Date): SatelliteState[] {
   const out: SatelliteState[] = [];
 
   for (const { tle, satrec } of getCatalogue()) {
-    const position = asEci(propagate(satrec, when)?.position);
+    // The propagator returns position AND velocity from the same integration;
+    // taking the speed here is free, where deriving it later would mean
+    // propagating the object a second time.
+    const propagated = propagate(satrec, when);
+    const position = asEci(propagated?.position);
     if (!position) continue;
+    const velocity = asEci(propagated?.velocity);
 
     const ecf = eciToEcf(position, gmst);
     const look = ecfToLookAngles(OBSERVER, ecf);
@@ -126,6 +150,7 @@ export function propagateAll(when: Date): SatelliteState[] {
     out.push({
       id: tle.id,
       name: tle.name,
+      noradId: tle.noradId,
       regime: tle.regime,
       azimuthDeg,
       elevationDeg,
@@ -134,6 +159,9 @@ export function propagateAll(when: Date): SatelliteState[] {
       latDeg: degreesLat(geo.latitude),
       lonDeg: degreesLong(geo.longitude),
       altitudeKm: geo.height,
+      speedKmS: velocity
+        ? Math.hypot(velocity.x, velocity.y, velocity.z)
+        : 0,
       visible,
     });
   }
@@ -165,3 +193,80 @@ export function orbitSample(
     altitudeKm: geo.height,
   };
 }
+
+/**
+ * Orbit shape for one object, read off its own elements.
+ *
+ * Not measured by propagating and watching. The elements already state the
+ * orbit exactly; sampling a revolution of SGP4 to rediscover its extremes
+ * would be a hundred propagations to recover a number the input gave us.
+ *
+ * The semi-major axis comes from the mean motion by Kepler's third law rather
+ * than from `satrec.a`. That property exists at runtime but is not in
+ * satellite.js's v5 typings, and reaching past the declared surface with an
+ * assertion to save one cube root is a bad trade — the assertion would keep
+ * compiling if the field were ever renamed, and start returning NaN.
+ *
+ * `no` is the Kozai mean motion in radians per minute. Using it unconverted
+ * puts apogee and perigee out by well under a kilometre, which is invisible at
+ * the one decimal place these are displayed to.
+ */
+export function orbitalElements(id: string): OrbitalElements | null {
+  const record = getCatalogue().find((c) => c.tle.id === id);
+  if (!record) return null;
+  const { ecco, inclo, no } = record.satrec;
+  if (!(no > 0)) return null;
+
+  const meanMotionRadS = no / 60;
+  const semiMajorKm = Math.cbrt(EARTH_MU / (meanMotionRadS * meanMotionRadS));
+  return {
+    apogeeKm: semiMajorKm * (1 + ecco) - EARTH_RADIUS_KM,
+    perigeeKm: semiMajorKm * (1 - ecco) - EARTH_RADIUS_KM,
+    inclinationDeg: toDeg(inclo),
+    periodMin: (2 * Math.PI) / no,
+  };
+}
+
+/** WGS-84 equatorial radius, km. */
+const EARTH_RADIUS_KM = 6378.137;
+/** Earth's standard gravitational parameter, km³/s². */
+const EARTH_MU = 398_600.4418;
+
+/**
+ * Look angles for ONE object at one instant.
+ *
+ * The single-object counterpart to `propagateAll`, and the reason both exist:
+ * drawing a 24-hour elevation profile for the selected spacecraft needs ~1 400
+ * samples of one object. Routing that through the bulk propagator would be
+ * 350 000 SGP4 calls to answer a question about a single satellite.
+ */
+export function lookAngleAt(
+  id: string,
+  when: number,
+): { azimuthDeg: number; elevationDeg: number; rangeKm: number; visible: boolean } | null {
+  const record = getCatalogue().find((c) => c.tle.id === id);
+  if (!record) return null;
+  return lookAngleFor(record.satrec, when);
+}
+
+function lookAngleFor(satrec: SatRec, when: number) {
+  const date = new Date(when);
+  const position = asEci(propagate(satrec, date)?.position);
+  if (!position) return null;
+  const look = ecfToLookAngles(OBSERVER, eciToEcf(position, gstime(date)));
+  const elevationDeg = toDeg(look.elevation);
+  return {
+    azimuthDeg: (toDeg(look.azimuth) + 360) % 360,
+    elevationDeg,
+    rangeKm: look.rangeSat,
+    visible:
+      elevationDeg >= TRACKING.elevationMaskDeg && look.rangeSat <= TRACKING.maxRangeKm,
+  };
+}
+
+/** Internal: the parsed record for one id, for callers that sample in a loop. */
+export function satrecFor(id: string): SatRec | null {
+  return getCatalogue().find((c) => c.tle.id === id)?.satrec ?? null;
+}
+
+export { lookAngleFor as _lookAngleFor };

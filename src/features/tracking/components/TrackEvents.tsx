@@ -4,8 +4,20 @@ import React, { useState } from 'react';
 import { ListFilter } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 
+/**
+ * TRACK EVENTS — the fence log.
+ *
+ * Every line is now a real transition recorded by the adapter: a spacecraft
+ * crossing into the tracking volume, winning or losing a beam cluster, or
+ * setting. It used to be a random draw from five ids, five statuses and six
+ * messages fired on a 5% chance each second, which produced a log that looked
+ * busy and said nothing — rows referring to objects the map was not drawing.
+ *
+ * The name column is new. With a catalogue of 250 rather than three fixed
+ * targets, an id alone is not enough to know what the row is about.
+ */
 export default function TrackEvents() {
-  const { events } = useDashboard();
+  const { events, setActiveSat } = useDashboard();
   const [filter, setFilter] = useState('all');
 
   const getStatusStyles = (status: string) => {
@@ -27,6 +39,12 @@ export default function TrackEvents() {
     if (filter === 'all') return true;
     return e.status === filter;
   });
+
+  /* Events are keyed by time+id+message rather than by index: the list is
+     prepended to, so an index key would re-associate every row with different
+     data on each new event and animate the whole log instead of one row. */
+  const keyFor = (e: (typeof events)[number], i: number) =>
+    `${e.time}-${e.id}-${e.message}-${i}`;
 
   return (
     <div className="da-card flex flex-col p-3 select-none w-full h-full min-h-0">
@@ -55,26 +73,30 @@ export default function TrackEvents() {
       <div className="grow min-h-0 overflow-y-auto my-1 pr-1 flex flex-col">
         {filteredEvents.length === 0 ? (
           <div className="h-full flex items-center justify-center text-[0.625rem] da-nums text-da-label">
-            NO LOGS RECORDED
+            {filter === 'all' ? 'WAITING FOR FENCE ACTIVITY' : 'NO EVENTS OF THIS TYPE'}
           </div>
         ) : (
           filteredEvents.map((evt, idx) => (
-            <div
-              key={idx}
-              className="flex flex-1 min-h-[1.375rem] items-center justify-between text-[0.625rem] da-nums border-b-[max(1px,0.0625rem)] border-da-border/30 hover:bg-da-bg/20 transition-all px-1 rounded-da-sm"
+            <button
+              key={keyFor(evt, idx)}
+              type="button"
+              onClick={() => setActiveSat(evt.id)}
+              title={`${evt.name} — select this target`}
+              className="flex flex-1 min-h-[1.375rem] w-full cursor-pointer items-center justify-between gap-2 text-[0.625rem] da-nums border-b-[max(1px,0.0625rem)] border-da-border/30 hover:bg-da-bg/40 transition-all px-1 rounded-da-sm text-left"
             >
-              <div className="flex items-center gap-4">
-                {/* Time */}
-                <span className="text-da-label da-nums">{evt.time}</span>
-                {/* Target ID */}
-                <span className="font-bold text-da-text">{evt.id}</span>
+              <div className="flex min-w-0 items-center gap-3">
+                {/* Simulated time, not wall time — the console's own clock. */}
+                <span className="text-da-label da-nums shrink-0">{evt.time}</span>
+                <span className="font-bold text-da-text shrink-0">{evt.id}</span>
+                <span className="truncate text-da-label">{evt.name}</span>
               </div>
 
-              {/* Event Description */}
-              <span className={`font-black uppercase text-right ${getStatusStyles(evt.status)}`}>
+              <span
+                className={`font-black uppercase text-right shrink-0 ${getStatusStyles(evt.status)}`}
+              >
                 {evt.message}
               </span>
-            </div>
+            </button>
           ))
         )}
       </div>

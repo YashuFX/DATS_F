@@ -1,12 +1,26 @@
 'use client';
 
 import React from 'react';
+import { TRACKING } from '@/features/mnc/data/mnc.mock';
 
+/**
+ * The tracking volume, as the simulation actually defines it.
+ *
+ * These were three hard-coded strings — "-60° to +60°", "10° to 70°", "0 to
+ * 2000 km" — and every one of them was wrong about the station they were drawn
+ * over. The dome is hemispherical: 26 faces cover the full 360° of azimuth and
+ * 0-90° of elevation between them, and the ±30° figure that inspired the old
+ * azimuth range is a single FACE's scan limit, not the aperture's.
+ *
+ * Read from `TRACKING` so the caption, the shell drawn on the globe and the
+ * planner's own visibility test cannot drift apart.
+ */
 export default function RadarFence() {
   const parameters = [
-    { label: 'Azimuth', value: '-60° to +60°' },
-    { label: 'Elevation', value: '10° to 70°' },
-    { label: 'Range/Height', value: '0 to 2000 km' },
+    { label: 'Azimuth', value: '0° to 360°' },
+    { label: 'Elevation', value: `${TRACKING.elevationMaskDeg}° to 90°` },
+    { label: 'Max Range', value: `${TRACKING.maxRangeKm.toLocaleString()} km` },
+    { label: 'Face Scan', value: `±${TRACKING.faceScanLimitDeg}°` },
   ];
 
   return (

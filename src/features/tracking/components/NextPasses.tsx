@@ -2,195 +2,163 @@
 
 import React from 'react';
 import { useDashboard } from '../context/DashboardContext';
+import { TRACKING } from '@/features/mnc/data/mnc.mock';
 
-interface PassData {
-  num: number;
-  status: 'visible' | 'upcoming';
-  isLive?: boolean;
-  aos: string;
-  los: string;
-  duration: string;
-  maxElevationPct: number;
-  distAos: string;
-  distLos: string;
-  distPeak: string;
-  maxElVal: string;
-  maxElColor: string;
+/**
+ * NEXT PASSES — the selected target's schedule, searched rather than written.
+ *
+ * These seven rows were literals. Beside a live tracking display that is worse
+ * than an empty table: it invites an operator to plan against times that have
+ * no relationship to where the spacecraft actually is. Every row here comes
+ * from propagating THIS satellite across the next 24 simulated hours and
+ * recording each crossing of the station's fence, so a pass listed here is a
+ * pass the map will show, at the minute it says.
+ *
+ * The table keeps its slot, its columns and its row treatment. Only the source
+ * changed.
+ */
+
+/** `HH:MM:SS` in the console's simulated clock, which is UTC. */
+function clock(ms: number): string {
+  const d = new Date(ms);
+  return [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join(':');
+}
+
+function duration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}m ${s}s`;
+}
+
+function km(value: number): string {
+  return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km`;
+}
+
+/**
+ * How good a contact is, as ink.
+ *
+ * Banded rather than continuous because the decision it supports is discrete:
+ * a 60° pass and an 80° pass are both excellent and an operator does not choose
+ * between them on two degrees. The bands are the same ones `passQuality` uses
+ * for the scheduler.
+ */
+function elevationTone(deg: number): string {
+  if (deg >= 45) return 'text-da-success';
+  if (deg >= 20) return 'text-da-text';
+  if (deg >= 10) return 'text-da-muted';
+  return 'text-da-label';
 }
 
 export default function NextPasses() {
-  const { activeSat, satellites } = useDashboard();
-  const sat = satellites[activeSat];
-
-  const passList: PassData[] = [
-    {
-      num: 1,
-      status: 'visible',
-      isLive: true,
-      aos: '08:56:00',
-      los: '09:11:55',
-      duration: '15m 55s',
-      maxElevationPct: 89,
-      distAos: '2,372.64 km',
-      distLos: '2,365.42 km',
-      distPeak: '426.19 km',
-      maxElVal: '89.79°',
-      maxElColor: 'text-da-success',
-    },
-    {
-      num: 2,
-      status: 'upcoming',
-      aos: '10:38:27',
-      los: '10:47:02',
-      duration: '8m 35s',
-      maxElevationPct: 11,
-      distAos: '2,372.24 km',
-      distLos: '2,361.15 km',
-      distPeak: '1,512.48 km',
-      maxElVal: '9.99°',
-      maxElColor: 'text-da-c2',
-    },
-    {
-      num: 3,
-      status: 'upcoming',
-      aos: '00:11:11',
-      los: '00:15:27',
-      duration: '4m 16s',
-      maxElevationPct: 2,
-      distAos: '2,338.86 km',
-      distLos: '2,350.46 km',
-      distPeak: '2,165.97 km',
-      maxElVal: '1.67°',
-      maxElColor: 'text-da-label',
-    },
-    {
-      num: 4,
-      status: 'upcoming',
-      aos: '01:44:00',
-      los: '01:54:33',
-      duration: '10m 33s',
-      maxElevationPct: 39,
-      distAos: '2,338.62 km',
-      distLos: '2,363.33 km',
-      distPeak: '684.34 km',
-      maxElVal: '35.42°',
-      maxElColor: 'text-da-text',
-    },
-    {
-      num: 5,
-      status: 'upcoming',
-      aos: '03:20:50',
-      los: '03:31:23',
-      duration: '10m 33s',
-      maxElevationPct: 33,
-      distAos: '2,349.23 km',
-      distLos: '2,368.62 km',
-      distPeak: '774.19 km',
-      maxElVal: '30.19°',
-      maxElColor: 'text-da-text',
-    },
-    {
-      num: 6,
-      status: 'upcoming',
-      aos: '05:00:15',
-      los: '05:07:44',
-      duration: '7m 29s',
-      maxElevationPct: 14,
-      distAos: '2,352.41 km',
-      distLos: '2,369.18 km',
-      distPeak: '1,220.14 km',
-      maxElVal: '13.12°',
-      maxElColor: 'text-da-muted',
-    },
-    {
-      num: 7,
-      status: 'upcoming',
-      aos: '06:42:10',
-      los: '06:51:30',
-      duration: '9m 20s',
-      maxElevationPct: 18,
-      distAos: '2,361.80 km',
-      distLos: '2,371.44 km',
-      distPeak: '1,024.50 km',
-      maxElVal: '16.45°',
-      maxElColor: 'text-da-muted',
-    },
-  ];
+  const { activeSat, satellites, passes, simTime } = useDashboard();
+  const sat = activeSat ? satellites[activeSat] : undefined;
 
   return (
     <div className="da-card flex flex-col p-3 select-none w-full h-full min-h-0">
       {/* Header */}
       <div className="shrink-0 border-b-[max(1px,0.0625rem)] border-da-border pb-2">
         <h3 className="text-[0.6875rem] font-black uppercase tracking-wider text-da-text">
-          Next Passes for {sat.name} in Next 24 Hours ({passList.length} Passes)
+          {sat
+            ? `Next Passes for ${sat.name} in Next 24 Hours (${passes.length} Passes)`
+            : 'Next Passes — no target selected'}
         </h3>
       </div>
 
       {/* Table Container */}
       <div className="grow min-h-0 overflow-auto mt-1">
-        <table className="h-full w-full text-left border-collapse text-[0.625rem] font-medium min-w-[43.75rem]">
-          <thead>
-            <tr className="text-da-label border-b-[max(1px,0.0625rem)] border-da-border/60 font-black uppercase tracking-wider">
-              <th className="py-1.5 w-8 font-black">#</th>
-              <th className="py-1.5 w-28 font-black">Status</th>
-              <th className="py-1.5 font-black">AOS (Start)</th>
-              <th className="py-1.5 font-black">LOS (End)</th>
-              <th className="py-1.5 font-black">Duration</th>
-              <th className="py-1.5 w-24 font-black">Max Elevation</th>
-              <th className="py-1.5 font-black">Distance at AOS</th>
-              <th className="py-1.5 font-black">Distance at LOS</th>
-              <th className="py-1.5 font-black">Distance at Peak</th>
-              <th className="py-1.5 text-right font-black">Max El</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-da-border/40 da-nums text-da-muted">
-            {passList.map(pass => (
-              <tr key={pass.num} className="hover:bg-da-bg/40 transition-colors">
-                <td className="py-1.5 text-da-label">{pass.num}</td>
-                <td className="py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    {pass.status === 'visible' ? (
-                      <span className="px-1.5 py-0.5 rounded-da-sm text-[0.5625rem] font-black uppercase bg-da-success/10 text-da-success border-[max(1px,0.0625rem)] border-da-success/20">
-                        Visible
-                      </span>
-                    ) : (
-                      <span className="px-1.5 py-0.5 rounded-da-sm text-[0.5625rem] font-black uppercase bg-da-warn/10 text-da-warn border-[max(1px,0.0625rem)] border-da-warn/30">
-                        Upcoming
-                      </span>
-                    )}
-
-                    {pass.isLive && (
-                      <span className="px-1.5 py-0.5 rounded-da-sm text-[0.5625rem] font-black uppercase bg-da-danger text-white flex items-center gap-1 animate-pulse">
-                        <span className="h-1 w-1 bg-white rounded-full" />
-                        Live
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="py-1.5 text-da-text font-bold">{pass.aos}</td>
-                <td className="py-1.5">{pass.los}</td>
-                <td className="py-1.5 font-sans font-semibold">{pass.duration}</td>
-                <td className="py-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-14 bg-da-bg rounded-full h-1.5 overflow-hidden border-[max(1px,0.0625rem)] border-da-border">
-                      <div
-                        className="bg-da-success h-full rounded-full"
-                        style={{ width: `${pass.maxElevationPct}%` }}
-                      />
-                    </div>
-                    <span className="text-[0.625rem] text-da-label font-bold">{pass.maxElevationPct}%</span>
-                  </div>
-                </td>
-                <td className="py-1.5">{pass.distAos}</td>
-                <td className="py-1.5">{pass.distLos}</td>
-                <td className="py-1.5">{pass.distPeak}</td>
-                <td className={`py-1.5 text-right font-black ${pass.maxElColor}`}>
-                  {pass.maxElVal}
-                </td>
+        {passes.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-[0.625rem] da-nums text-da-label">
+            NO PASSES OVER THE FENCE IN THE NEXT 24 HOURS
+          </div>
+        ) : (
+          <table className="h-full w-full text-left border-collapse text-[0.625rem] font-medium min-w-[43.75rem]">
+            <thead>
+              <tr className="text-da-label border-b-[max(1px,0.0625rem)] border-da-border/60 font-black uppercase tracking-wider">
+                <th className="py-1.5 w-8 font-black">#</th>
+                <th className="py-1.5 w-28 font-black">Status</th>
+                <th className="py-1.5 font-black">AOS (Start)</th>
+                <th className="py-1.5 font-black">LOS (End)</th>
+                <th className="py-1.5 font-black">Duration</th>
+                <th className="py-1.5 w-24 font-black">Max Elevation</th>
+                <th className="py-1.5 font-black">Distance at AOS</th>
+                <th className="py-1.5 font-black">Distance at LOS</th>
+                <th className="py-1.5 font-black">Distance at Peak</th>
+                <th className="py-1.5 text-right font-black">Max El</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-da-border/40 da-nums text-da-muted">
+              {passes.map((pass, index) => {
+                const live = simTime >= pass.aos && simTime < pass.los;
+                const done = simTime >= pass.los;
+                /* The bar is the peak against the sky the aperture can actually
+                   use — mask to zenith — not against a flat 90°. A pass peaking
+                   at 8° over a 5° mask has used almost none of the available
+                   sky, and against 90° it would read as 9% rather than 3%. */
+                const usable = 90 - TRACKING.elevationMaskDeg;
+                const pct = Math.max(
+                  0,
+                  Math.min(100, ((pass.peakElevationDeg - TRACKING.elevationMaskDeg) / usable) * 100),
+                );
+
+                return (
+                  <tr key={pass.aos} className="hover:bg-da-bg/40 transition-colors">
+                    <td className="py-1.5 text-da-label">{index + 1}</td>
+                    <td className="py-1.5">
+                      <div className="flex items-center gap-1.5">
+                        {done ? (
+                          <span className="px-1.5 py-0.5 rounded-da-sm text-[0.5625rem] font-black uppercase bg-da-label/10 text-da-label border-[max(1px,0.0625rem)] border-da-label/20">
+                            Complete
+                          </span>
+                        ) : live ? (
+                          <span className="px-1.5 py-0.5 rounded-da-sm text-[0.5625rem] font-black uppercase bg-da-success/10 text-da-success border-[max(1px,0.0625rem)] border-da-success/20">
+                            Visible
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-da-sm text-[0.5625rem] font-black uppercase bg-da-warn/10 text-da-warn border-[max(1px,0.0625rem)] border-da-warn/30">
+                            Upcoming
+                          </span>
+                        )}
+
+                        {live && (
+                          <span className="px-1.5 py-0.5 rounded-da-sm text-[0.5625rem] font-black uppercase bg-da-danger text-white flex items-center gap-1 animate-pulse">
+                            <span className="h-1 w-1 bg-white rounded-full" />
+                            Live
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-1.5 text-da-text font-bold">{clock(pass.aos)}</td>
+                    <td className="py-1.5">{clock(pass.los)}</td>
+                    <td className="py-1.5 font-sans font-semibold">{duration(pass.durationS)}</td>
+                    <td className="py-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-14 bg-da-bg rounded-full h-1.5 overflow-hidden border-[max(1px,0.0625rem)] border-da-border">
+                          <div
+                            className="bg-da-success h-full rounded-full"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[0.625rem] text-da-label font-bold">
+                          {pct.toFixed(0)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-1.5">{km(pass.rangeAtAosKm)}</td>
+                    <td className="py-1.5">{km(pass.rangeAtLosKm)}</td>
+                    <td className="py-1.5">{km(pass.minRangeKm)}</td>
+                    <td
+                      className={`py-1.5 text-right font-black ${elevationTone(pass.peakElevationDeg)}`}
+                    >
+                      {pass.peakElevationDeg.toFixed(2)}°
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

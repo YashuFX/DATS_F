@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useSimStore } from "./simStore";
 
 /**
@@ -17,10 +17,43 @@ import { useSimStore } from "./simStore";
  * Elapsed REAL time is measured per tick rather than assumed to be the
  * interval: a busy main thread delivers late timers, and assuming 250 ms would
  * make the simulated clock drift slower than the wall clock under load.
+ *
+ * ---- one interval, however many mounts ----
+ *
+ * `advance` is fed the MEASURED elapsed time since the last tick, so two
+ * intervals would each hand it a full interval's worth and the simulated clock
+ * would run at double speed — silently, and only on whichever screen happened
+ * to mount two displays. That became a live risk the moment the tracking
+ * display was shared between the board and the tracking console, so the
+ * invariant is enforced here rather than left as a rule for callers to keep.
  */
+
+let clockRefs = 0;
+let clockTimer: number | undefined;
+let clockLast = 0;
+
+function acquireClock(): () => void {
+  clockRefs += 1;
+  if (clockRefs === 1) {
+    clockLast = performance.now();
+    clockTimer = window.setInterval(() => {
+      const now = performance.now();
+      const delta = now - clockLast;
+      clockLast = now;
+      useSimStore.getState().advance(delta);
+    }, 250);
+  }
+  return () => {
+    clockRefs -= 1;
+    if (clockRefs === 0 && clockTimer !== undefined) {
+      window.clearInterval(clockTimer);
+      clockTimer = undefined;
+    }
+  };
+}
+
 export function useSimClock() {
   const running = useSimStore((s) => s.running);
-  const last = useRef(0);
 
   // Paint the sky once on mount, before anything is running. Without this the
   // panel opens on an empty globe and the operator has to press Start to
@@ -32,15 +65,6 @@ export function useSimClock() {
 
   useEffect(() => {
     if (!running) return;
-    last.current = performance.now();
-
-    const id = window.setInterval(() => {
-      const now = performance.now();
-      const delta = now - last.current;
-      last.current = now;
-      useSimStore.getState().advance(delta);
-    }, 250);
-
-    return () => window.clearInterval(id);
+    return acquireClock();
   }, [running]);
 }
